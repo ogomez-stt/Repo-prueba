@@ -1,0 +1,13 @@
+{
+  "name": "@stt/repo-prueba.srv.api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "modules/service"
+  ],
+  "scripts": {
+    "webiai:dev": "webiai infra dev",
+    "srv.api": "npm run webiai:dev"
+  }
+}
