@@ -5,7 +5,7 @@
   "type": "module",
   "workspaces": [],
   "scripts": {
-    "webiai:dev": "webiai infra dev",
-    "app.web": "npm run webiai:dev"
+    "app.web": "npm run webiai:dev",
+    "webiai:dev": "webiai infra dev"
   }
 }

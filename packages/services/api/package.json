@@ -7,7 +7,7 @@
     "modules/service"
   ],
   "scripts": {
-    "webiai:dev": "webiai infra dev",
-    "srv.api": "npm run webiai:dev"
+    "srv.api": "npm run webiai:dev",
+    "webiai:dev": "webiai infra dev"
   }
 }

@@ -13,12 +13,6 @@
       "@res/*": [
         "./resources/*"
       ],
-      "@module:app": [
-        "./modules/app/src/index"
-      ],
-      "@module:app/*": [
-        "./modules/app/src/*"
-      ],
       "@sst/platform/*": [
         "./.sst/platform/src/*"
       ],

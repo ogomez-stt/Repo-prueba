@@ -4,6 +4,8 @@
     "packages/services/api",
     "packages/services/api/modules/*",
     "packages/apps/web",
-    "packages/apps/web/modules/*"
+    "packages/apps/web/modules/*",
+    "packages/cloud/core",
+    "packages/cloud/core/modules/*"
   ]
 }

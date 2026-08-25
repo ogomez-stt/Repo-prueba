@@ -13,21 +13,23 @@
   },
   "workspaces": [
     "packages/services/api",
-    "packages/apps/web"
+    "packages/apps/web",
+    "packages/cloud/core"
   ],
   "devDependencies": {
     "@webiai/devlink": "^2.8.1",
     "@webiai/sdk.cli": "0.23.11",
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "typescript": "~5.7.2"
   },
   "overrides": {
     "google-protobuf": "3.21.2"
   },
   "dependencies": {
-    "@webiai/sdk.aws": "0.23.11",
     "@webiai/sdk.core": "0.23.11",
-    "@webiai/sdk.http": "0.23.11",
+    "@webiai/sdk.aws": "0.23.11",
     "@webiai/sdk.infra-provider": "0.23.11",
+    "@webiai/sdk.http": "0.23.11",
     "@webiai/sdk.ioc": "0.23.11"
   }
 }
