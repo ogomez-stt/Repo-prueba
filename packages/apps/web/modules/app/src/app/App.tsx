@@ -1,6 +1,9 @@
 import { Routes, Route } from "react-router";
 import { AppShell } from "@/app/AppShell";
 import { WelcomePage } from "@/pages/WelcomePage";
+import SignInForm from "@/pages/auth/sign-in";
+import SignUpForm from "@/pages/auth/sign-up";
+import ResetPasswordForm from "@/pages/auth/reset-password";
 
 /**
  * App - Clean starter application with minimal shell
@@ -86,8 +89,10 @@ export default function App() {
       {/* ════════════════════════════════════════════════════════════════════
           RUTAS STANDALONE
           Páginas sin shell - tienen su propio layout completo
-          Ejemplo: <Route path="/login" element={<LoginPage />} />
           ════════════════════════════════════════════════════════════════════ */}
+      <Route path="/login" element={<SignInForm />} />
+      <Route path="/register" element={<SignUpForm />} />
+      <Route path="/forgot-password" element={<ResetPasswordForm />} />
     </Routes>
   );
 }
