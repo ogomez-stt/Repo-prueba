@@ -34,14 +34,14 @@ export const BaseAppSidebar: React.FC<BaseAppSidebarProps> = observer(({
 
   const positionClasses = contained
     ? "relative h-full"
-    : `fixed top-0 left-0 h-screen z-50 ${uiStore.sidebarMobileOpen ? "translate-x-0" : "-translate-x-full"} xl:translate-x-0`;
+    : `fixed top-4 left-4 h-[calc(100vh-2rem)] z-50 ${uiStore.sidebarMobileOpen ? "translate-x-0" : "-translate-x-[120%]"} xl:translate-x-0`;
 
   return (
     <SidebarProvider collapsed={collapsed}>
       <aside
-        className={`flex flex-col px-5 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 transition-all duration-300 ease-in-out rounded-tr-3xl rounded-br-3xl shadow-theme-lg 
+        className={`flex flex-col px-5 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 transition-all duration-300 ease-in-out rounded-3xl shadow-theme-lg 
           ${positionClasses}
-          ${showExpanded ? "w-[290px]" : "w-[90px]"}`}
+          ${showExpanded ? "w-[274px]" : "w-[78px]"}`}
         onMouseEnter={() => collapsed === undefined && !uiStore.isDesktopSidebarExpanded && uiStore.setSidebarHovered(true)}
         onMouseLeave={() => collapsed === undefined && uiStore.setSidebarHovered(false)}
       >

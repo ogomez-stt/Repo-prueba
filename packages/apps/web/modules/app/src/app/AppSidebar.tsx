@@ -36,9 +36,9 @@ const LogoCollapsed = () => (
     className="flex items-center justify-center h-10 w-10 rounded-xl border-2 border-brand-500"
   >
     <img
-      src="/images/logo/necto-icon.png"
+      src="/images/logo/necto-icon.svg"
       alt="NECTO"
-      className="h-5 w-auto"
+      className="h-6 w-6"
     />
   </Link>
 );
