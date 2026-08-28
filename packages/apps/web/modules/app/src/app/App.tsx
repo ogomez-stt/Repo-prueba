@@ -88,6 +88,9 @@ export default function App() {
         <Route path="/turnos" element={<PlaceholderPage title="Mis Turnos" description="Gestiona tus turnos activos." />} />
         <Route path="/colas" element={<PlaceholderPage title="Colas" description="Administra las colas de atencion." />} />
         <Route path="/encuestas" element={<PlaceholderPage title="Encuestas" description="Encuestas de satisfaccion." />} />
+        <Route path="/agendamiento" element={<PlaceholderPage title="Agenda" description="Vista principal de agendamientos." />} />
+        <Route path="/agendamiento/detalles" element={<PlaceholderPage title="Detalles de agendamiento" description="Detalle de un agendamiento." />} />
+        <Route path="/agendamiento/crear" element={<PlaceholderPage title="Crear agendamiento" description="Crea un nuevo agendamiento." />} />
         <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
         <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>

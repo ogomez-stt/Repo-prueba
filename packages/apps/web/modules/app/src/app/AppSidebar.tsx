@@ -14,6 +14,9 @@ import {
   PlugInIcon,
   InfoIcon,
   ArrowRightIcon,
+  CalenderIcon,
+  PlusIcon,
+  DocsIcon,
 } from "@/icons";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -107,14 +110,27 @@ const SidebarContent = () => {
 
   return (
     <nav className="flex flex-col flex-1">
-      <div>
-        <MenuSectionHeader title="Menu" />
-        <ul className="flex flex-col gap-1">
-          <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
-          <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
-          <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
-          <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
-        </ul>
+      <div className="flex flex-col gap-6">
+        {/* TURNOS */}
+        <div>
+          <MenuSectionHeader title="Turnos" />
+          <ul className="flex flex-col gap-1">
+            <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
+            <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
+            <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
+            <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
+          </ul>
+        </div>
+
+        {/* AGENDAMIENTO */}
+        <div>
+          <MenuSectionHeader title="Agendamiento" />
+          <ul className="flex flex-col gap-1">
+            <MenuItem icon={<CalenderIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
+            <MenuItem icon={<DocsIcon />} name="Detalles" path="/agendamiento/detalles" isActive={isActive} />
+            <MenuItem icon={<PlusIcon />} name="Crear agendamiento" path="/agendamiento/crear" isActive={isActive} />
+          </ul>
+        </div>
       </div>
 
       <SidebarFooter />
