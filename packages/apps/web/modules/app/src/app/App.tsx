@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router";
 import { AppShell } from "@/app/AppShell";
 import { WelcomePage } from "@/pages/WelcomePage";
+import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
 import ResetPasswordForm from "@/pages/auth/reset-password";
@@ -84,6 +85,11 @@ export default function App() {
           ════════════════════════════════════════════════════════════════════ */}
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<WelcomePage />} />
+        <Route path="/turnos" element={<PlaceholderPage title="Mis Turnos" description="Gestiona tus turnos activos." />} />
+        <Route path="/colas" element={<PlaceholderPage title="Colas" description="Administra las colas de atencion." />} />
+        <Route path="/encuestas" element={<PlaceholderPage title="Encuestas" description="Encuestas de satisfaccion." />} />
+        <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
+        <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>
 
       {/* ════════════════════════════════════════════════════════════════════

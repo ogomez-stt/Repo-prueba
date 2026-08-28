@@ -1,74 +1,122 @@
-import { 
-  BaseAppSidebar, 
+import { Link, useNavigate } from "react-router";
+import { observer } from "mobx-react-lite";
+import {
+  BaseAppSidebar,
   MenuSectionHeader,
   MenuItem,
 } from "@/shell";
-import { GridIcon } from "@/icons";
+import { useSidebarContext } from "@/shell/sidebar/SidebarContext";
+import {
+  GridIcon,
+  TaskIcon,
+  ListIcon,
+  ShootingStarIcon,
+  PlugInIcon,
+  InfoIcon,
+  ArrowRightIcon,
+} from "@/icons";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOGO COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const Logo = () => (
-  <div className="flex items-center gap-2">
-    <svg
-      className="h-8 w-8 text-blue-600 dark:text-blue-400"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-      />
-    </svg>
-    <span className="text-xl font-semibold text-gray-800 dark:text-white">
-      My App
-    </span>
-  </div>
+  <Link to="/dashboard" className="flex items-center">
+    <img
+      src="/images/logo/necto-full.png"
+      alt="NECTO"
+      className="h-9 w-auto"
+    />
+  </Link>
 );
 
 const LogoCollapsed = () => (
-  <svg
-    className="h-8 w-8 text-blue-600 dark:text-blue-400"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
+  <Link
+    to="/dashboard"
+    className="flex items-center justify-center h-10 w-10 rounded-xl border-2 border-brand-500"
   >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+    <img
+      src="/images/logo/necto-icon.png"
+      alt="NECTO"
+      className="h-5 w-auto"
     />
-  </svg>
+  </Link>
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SIDEBAR CONTENT - Minimal menu for new applications
+// FOOTER — pinned actions (Configuracion, Ayuda, Cerrar sesion)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SidebarFooter = observer(() => {
+  const { isExpanded: showExpanded } = useSidebarContext();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // TODO: integrate with Cognito sign-out
+    navigate("/login");
+  };
+
+  const rowClasses = `menu-item group menu-item-inactive ${
+    !showExpanded ? "xl:justify-center" : "xl:justify-start"
+  }`;
+
+  return (
+    <div className="mt-auto border-t border-gray-200 dark:border-gray-800 pt-4 pb-6">
+      <ul className="flex flex-col gap-1">
+        <li>
+          <Link to="/configuracion" className={rowClasses}>
+            <span className="menu-item-icon-size menu-item-icon-inactive">
+              <PlugInIcon />
+            </span>
+            {showExpanded && <span className="menu-item-text">Configuracion</span>}
+          </Link>
+        </li>
+        <li>
+          <Link to="/ayuda" className={rowClasses}>
+            <span className="menu-item-icon-size menu-item-icon-inactive">
+              <InfoIcon />
+            </span>
+            {showExpanded && <span className="menu-item-text">Ayuda</span>}
+          </Link>
+        </li>
+        <li>
+          <button
+            onClick={handleLogout}
+            className={`menu-item group text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10 cursor-pointer ${
+              !showExpanded ? "xl:justify-center" : "xl:justify-start"
+            }`}
+          >
+            <span className="menu-item-icon-size text-error-500">
+              <ArrowRightIcon />
+            </span>
+            {showExpanded && <span className="menu-item-text">Cerrar sesion</span>}
+          </button>
+        </li>
+      </ul>
+    </div>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR CONTENT — Sistema de Turnos
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SidebarContent = () => {
   const isActive = (path: string) => window.location.pathname === path;
 
   return (
-    <nav className="mb-6">
-      <div className="flex flex-col gap-4">
-        <div>
-          <MenuSectionHeader title="Menu" />
-          <ul className="flex flex-col gap-1">
-            <MenuItem
-              icon={<GridIcon />}
-              name="Dashboard"
-              path="/"
-              isActive={isActive}
-            />
-            {/* Add more menu items here */}
-          </ul>
-        </div>
+    <nav className="flex flex-col flex-1">
+      <div>
+        <MenuSectionHeader title="Menu" />
+        <ul className="flex flex-col gap-1">
+          <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
+          <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
+          <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
+          <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
+        </ul>
       </div>
+
+      <SidebarFooter />
     </nav>
   );
 };
@@ -78,10 +126,7 @@ const SidebarContent = () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * AppSidebar is a minimal sidebar for new applications.
- * Customize the Logo, LogoCollapsed, and SidebarContent to fit your needs.
- * 
- * For a full-featured demo with TailAdmin-style menu, see `demo/DemoSidebar`.
+ * AppSidebar — NECTO-branded navigation for the queue management system.
  * @kgId 8025fcb3eb97
  */
 export const AppSidebar = () => (
