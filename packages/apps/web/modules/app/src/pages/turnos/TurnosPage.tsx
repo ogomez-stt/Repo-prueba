@@ -2,55 +2,115 @@ import { useState } from "react";
 import { PageMeta } from "@/shell/meta";
 import { Alert } from "@/elements/ui/alert";
 import { ButtonsGroup } from "@/elements/ui/buttons-group";
-import { TicketCard, type Ticket } from "./components/TicketCard";
+import { Modal } from "@/elements/ui/modal";
+import { Button } from "@/elements/ui/button";
+import { TicketCard, type Ticket, type TicketState } from "./components/TicketCard";
 
 type Mode = "auto" | "manual";
+type ColumnKey = "waiting" | "serving" | "done";
 
-// ── Mock data ──
-const waitingInit: Ticket[] = [
-  { numero: "A-043", cliente: "Ana Silva", servicio: "Asesoria Comercial", espera: "15 min", urgent: true },
-  { numero: "B-108", cliente: "Carlos Mendoza", servicio: "Soporte Tecnico", espera: "12 min", urgent: true },
-  { numero: "A-044", cliente: "Pedro Ramirez", servicio: "Asesoria Comercial", espera: "6 min" },
-  { numero: "C-013", cliente: "Lucia Torres", servicio: "Retiros", espera: "3 min" },
-];
+interface Board {
+  waiting: Ticket[];
+  serving: Ticket[];
+  done: Ticket[];
+}
 
-const servingInit: Ticket[] = [
-  { numero: "A-042", cliente: "Maria Gonzalez", servicio: "Asesoria Comercial", espera: "0 min" },
-];
+const initialBoard: Board = {
+  waiting: [
+    { numero: "A-043", cliente: "Ana Silva", servicio: "Asesoria Comercial", espera: "15 min", urgent: true },
+    { numero: "B-108", cliente: "Carlos Mendoza", servicio: "Soporte Tecnico", espera: "12 min", urgent: true },
+    { numero: "A-044", cliente: "Pedro Ramirez", servicio: "Asesoria Comercial", espera: "6 min" },
+    { numero: "C-013", cliente: "Lucia Torres", servicio: "Retiros", espera: "3 min" },
+  ],
+  serving: [
+    { numero: "A-042", cliente: "Maria Gonzalez", servicio: "Asesoria Comercial", espera: "0 min" },
+  ],
+  done: [
+    { numero: "C-012", cliente: "Juan Perez", servicio: "Retiros", espera: "" },
+    { numero: "A-041", cliente: "Sofia Diaz", servicio: "Asesoria Comercial", espera: "" },
+  ],
+};
 
-const doneInit: Ticket[] = [
-  { numero: "C-012", cliente: "Juan Perez", servicio: "Retiros", espera: "" },
-  { numero: "A-041", cliente: "Sofia Diaz", servicio: "Asesoria Comercial", espera: "" },
+const columnMeta: { key: ColumnKey; title: string; state: TicketState; count: (b: Board) => number; badgeClass: string }[] = [
+  { key: "waiting", title: "Esperando", state: "waiting", count: (b) => b.waiting.length, badgeClass: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
+  { key: "serving", title: "Atendiendo", state: "serving", count: (b) => b.serving.length, badgeClass: "bg-secondary-100 text-secondary-700 dark:bg-secondary-500/20 dark:text-secondary-300" },
+  { key: "done", title: "Listos hoy", state: "done", count: (b) => b.done.length, badgeClass: "bg-success-50 text-success-600 dark:bg-success-500/15" },
 ];
 
 /**
  * TurnosPage — "Mis Turnos" queue board for small businesses.
- * Auto (FIFO) / Manual attention modes, large touch-friendly cards.
+ * Auto (FIFO, read-only) / Manual (drag & drop + actions) modes.
  */
 export const TurnosPage = () => {
   const [mode, setMode] = useState<Mode>("auto");
+  const [board, setBoard] = useState<Board>(initialBoard);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [service, setService] = useState("todos");
 
-  const waiting = waitingInit.filter((t) => {
+  // Drag state
+  const [dragged, setDragged] = useState<{ from: ColumnKey; numero: string } | null>(null);
+  const [dragOver, setDragOver] = useState<ColumnKey | null>(null);
+
+  // Modals
+  const [rescheduleTicket, setRescheduleTicket] = useState<Ticket | null>(null);
+  const [cancelTicket, setCancelTicket] = useState<{ ticket: Ticket; reason: "cancel" | "noshow" } | null>(null);
+
+  const isManual = mode === "manual";
+
+  const filterFn = (t: Ticket) => {
     const matchSearch = !search ||
       t.cliente.toLowerCase().includes(search.toLowerCase()) ||
       t.numero.toLowerCase().includes(search.toLowerCase());
     const matchService = service === "todos" || t.servicio === service;
     return matchSearch && matchService;
-  });
+  };
 
+  const waiting = board.waiting.filter(filterFn);
   const urgentCount = waiting.filter((t) => t.urgent).length;
-  const waitingCount = waiting.length;
+  const waitingCount = board.waiting.length;
 
   const subtitle = waitingCount > 0
     ? `Tienes ${waitingCount} ${waitingCount === 1 ? "persona esperando" : "personas esperando"}`
     : "No hay nadie esperando ahora";
 
-  const services = ["todos", ...Array.from(new Set(waitingInit.map((t) => t.servicio)))];
+  const services = ["todos", ...Array.from(new Set(initialBoard.waiting.map((t) => t.servicio)))];
 
-  const isEmpty = waitingInit.length === 0 && servingInit.length === 0 && doneInit.length === 0;
+  // ── Drag & drop (manual only) ──
+  const handleDrop = (target: ColumnKey) => {
+    if (!dragged || dragged.from === target) { setDragOver(null); return; }
+    setBoard((prev) => {
+      const fromList = [...prev[dragged.from]];
+      const idx = fromList.findIndex((t) => t.numero === dragged.numero);
+      if (idx === -1) return prev;
+      const [moved] = fromList.splice(idx, 1);
+      const cleaned = target === "done" ? { ...moved, urgent: false } : moved;
+      return { ...prev, [dragged.from]: fromList, [target]: [...prev[target], cleaned] };
+    });
+    setDragged(null);
+    setDragOver(null);
+  };
+
+  const movePrimary = (from: ColumnKey, numero: string) => {
+    const target: ColumnKey = from === "waiting" ? "serving" : "done";
+    setBoard((prev) => {
+      const fromList = [...prev[from]];
+      const idx = fromList.findIndex((t) => t.numero === numero);
+      if (idx === -1) return prev;
+      const [moved] = fromList.splice(idx, 1);
+      return { ...prev, [from]: fromList, [target]: [...prev[target], { ...moved, urgent: false }] };
+    });
+  };
+
+  const removeTicket = (numero: string) => {
+    setBoard((prev) => ({
+      waiting: prev.waiting.filter((t) => t.numero !== numero),
+      serving: prev.serving.filter((t) => t.numero !== numero),
+      done: prev.done,
+    }));
+  };
+
+  const columnData = (key: ColumnKey): Ticket[] => (key === "waiting" ? waiting : board[key]);
 
   return (
     <>
@@ -71,13 +131,32 @@ export const TurnosPage = () => {
               { label: "Automatico", onClick: () => setMode("auto") },
               { label: "Manual", onClick: () => setMode("manual") },
             ]}
-            variant={mode === "auto" ? "primary" : "secondary"}
+            variant="secondary"
           />
         </div>
-        <button className="rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600">
-          Llamar siguiente
-        </button>
+        {/* Llamar siguiente only in manual mode */}
+        {isManual && (
+          <button className="rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600">
+            Llamar siguiente
+          </button>
+        )}
       </div>
+
+      {/* Auto mode banner */}
+      {!isManual && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">Modo automatico activo</p>
+            <p className="text-xs text-brand-600/80 dark:text-brand-300/70">
+              El sistema esta llamando los turnos en orden de llegada (FIFO). Cambia a Manual para gestionar los turnos tu mismo.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Search + service filter */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
@@ -98,89 +177,122 @@ export const TurnosPage = () => {
         </select>
       </div>
 
-      {isEmpty ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-900">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-success-50 text-success-500 dark:bg-success-500/15">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-7 w-7">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      {/* Board */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {columnMeta.map((col) => {
+          const tickets = columnData(col.key);
+          const isDropTarget = isManual && dragOver === col.key;
+          return (
+            <div
+              key={col.key}
+              onDragOver={isManual ? (e) => { e.preventDefault(); setDragOver(col.key); } : undefined}
+              onDragLeave={isManual ? () => setDragOver((c) => (c === col.key ? null : c)) : undefined}
+              onDrop={isManual ? () => handleDrop(col.key) : undefined}
+              className={
+                "rounded-2xl p-1 transition-colors " +
+                (isDropTarget ? "bg-brand-50 ring-2 ring-dashed ring-brand-300 dark:bg-brand-500/10" : "")
+              }
+            >
+              <div className="mb-3 flex items-center justify-between px-1">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">{col.title}</h2>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${col.badgeClass}`}>{col.count(board)}</span>
+              </div>
+
+              {col.key === "waiting" && urgentCount > 0 && (
+                <div className="mb-3">
+                  <Alert
+                    variant="warning"
+                    title="Atencion"
+                    message={`${urgentCount} ${urgentCount === 1 ? "persona lleva" : "personas llevan"} mucho esperando`}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3">
+                {tickets.map((t) => (
+                  <TicketCard
+                    key={t.numero}
+                    ticket={t}
+                    state={col.state}
+                    interactive={isManual}
+                    selected={isManual && selected === t.numero}
+                    onSelect={() => setSelected(t.numero)}
+                    onPrimary={() => movePrimary(col.key, t.numero)}
+                    onReschedule={() => setRescheduleTicket(t)}
+                    onNoShow={() => setCancelTicket({ ticket: t, reason: "noshow" })}
+                    onCancel={() => setCancelTicket({ ticket: t, reason: "cancel" })}
+                    onDragStart={() => setDragged({ from: col.key, numero: t.numero })}
+                    onDragEnd={() => { setDragged(null); setDragOver(null); }}
+                  />
+                ))}
+                {tickets.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-800">
+                    {col.key === "waiting" ? "Nadie esperando" : col.key === "serving" ? "Nadie en atencion" : "Aun sin completar"}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Reschedule modal */}
+      <Modal isOpen={!!rescheduleTicket} onClose={() => setRescheduleTicket(null)} className="max-w-[440px] p-6">
+        <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Reagendar turno</h4>
+        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+          {rescheduleTicket && `${rescheduleTicket.numero} — ${rescheduleTicket.cliente}`}
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nueva fecha</label>
+            <input type="date" className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-brand-400 focus:outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nueva hora</label>
+            <input type="time" className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-brand-400 focus:outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nota (opcional)</label>
+            <textarea rows={2} placeholder="Motivo del cambio..." className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-400 focus:outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200" />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setRescheduleTicket(null)}>Cancelar</Button>
+          <Button size="sm" onClick={() => setRescheduleTicket(null)}>Reagendar</Button>
+        </div>
+      </Modal>
+
+      {/* Cancel / No-show modal */}
+      <Modal isOpen={!!cancelTicket} onClose={() => setCancelTicket(null)} showCloseButton={false} className="max-w-[420px] p-6">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error-50 text-error-500 dark:bg-error-500/15">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Todo al dia</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">No hay nadie esperando.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {/* Esperando */}
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Esperando</h2>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">{waiting.length}</span>
-            </div>
-
-            {urgentCount > 0 && (
-              <div className="mb-3">
-                <Alert
-                  variant="warning"
-                  title="Atencion"
-                  message={`${urgentCount} ${urgentCount === 1 ? "persona lleva" : "personas llevan"} mucho esperando`}
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-              {waiting.map((t) => (
-                <TicketCard
-                  key={t.numero}
-                  ticket={t}
-                  state="waiting"
-                  selectable={mode === "manual"}
-                  selected={mode === "manual" && selected === t.numero}
-                  onSelect={() => setSelected(t.numero)}
-                  onPrimary={() => { /* atender */ }}
-                  onNoShow={() => { /* no se presento */ }}
-                  onReschedule={() => { /* reagendar */ }}
-                />
-              ))}
-              {waiting.length === 0 && (
-                <p className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-800">
-                  Nadie esperando
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Atendiendo */}
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Atendiendo</h2>
-              <span className="rounded-full bg-secondary-100 px-2 py-0.5 text-xs font-medium text-secondary-700 dark:bg-secondary-500/20 dark:text-secondary-300">{servingInit.length}</span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {servingInit.map((t) => (
-                <TicketCard key={t.numero} ticket={t} state="serving" onPrimary={() => {}} onNoShow={() => {}} onReschedule={() => {}} />
-              ))}
-              {servingInit.length === 0 && (
-                <p className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400 dark:border-gray-800">
-                  Nadie en atencion
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Listos hoy */}
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Listos hoy</h2>
-              <span className="rounded-full bg-success-50 px-2 py-0.5 text-xs font-medium text-success-600 dark:bg-success-500/15">{doneInit.length}</span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {doneInit.map((t) => (
-                <TicketCard key={t.numero} ticket={t} state="done" />
-              ))}
-            </div>
+          <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">
+            {cancelTicket?.reason === "noshow" ? "Marcar como no se presento" : "Cancelar turno"}
+          </h4>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {cancelTicket && `${cancelTicket.ticket.numero} — ${cancelTicket.ticket.cliente}`}
+          </p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {cancelTicket?.reason === "noshow"
+              ? "El turno se marcara como no presentado y saldra de la cola."
+              : "Esta accion quitara el turno de la cola. No se puede deshacer."}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Button size="sm" variant="outline" onClick={() => setCancelTicket(null)}>Volver</Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => { if (cancelTicket) removeTicket(cancelTicket.ticket.numero); setCancelTicket(null); }}
+            >
+              {cancelTicket?.reason === "noshow" ? "Marcar" : "Cancelar turno"}
+            </Button>
           </div>
         </div>
-      )}
+      </Modal>
     </>
   );
 };

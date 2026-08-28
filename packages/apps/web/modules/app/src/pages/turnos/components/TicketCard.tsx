@@ -15,13 +15,17 @@ export interface Ticket {
 interface TicketCardProps {
   ticket: Ticket;
   state: TicketState;
-  /** Manual mode: card is selectable */
-  selectable?: boolean;
+  /** Manual mode: card is interactive (draggable + has primary action) */
+  interactive?: boolean;
   selected?: boolean;
   onSelect?: () => void;
   onPrimary?: () => void;
   onNoShow?: () => void;
   onReschedule?: () => void;
+  onCancel?: () => void;
+  /** Drag handlers (manual mode) */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 const WhatsAppBadge = () => (
@@ -33,7 +37,7 @@ const WhatsAppBadge = () => (
   </span>
 );
 
-const OverflowMenu = ({ onNoShow, onReschedule }: { onNoShow?: () => void; onReschedule?: () => void }) => {
+const OverflowMenu = ({ onNoShow, onReschedule, onCancel }: { onNoShow?: () => void; onReschedule?: () => void; onCancel?: () => void }) => {
   const [open, setOpen] = useState(false);
   const item = "block w-full rounded-md px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5";
   return (
@@ -52,7 +56,8 @@ const OverflowMenu = ({ onNoShow, onReschedule }: { onNoShow?: () => void; onRes
         className="absolute right-0 z-40 mt-1 w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-theme-lg dark:border-gray-800 dark:bg-gray-900"
       >
         <ShellDropdownItem className={item} onItemClick={() => setOpen(false)} onClick={onReschedule}>Reagendar</ShellDropdownItem>
-        <ShellDropdownItem className={`${item} text-error-500`} onItemClick={() => setOpen(false)} onClick={onNoShow}>No se presento</ShellDropdownItem>
+        <ShellDropdownItem className={item} onItemClick={() => setOpen(false)} onClick={onNoShow}>No se presento</ShellDropdownItem>
+        <ShellDropdownItem className={`${item} text-error-500`} onItemClick={() => setOpen(false)} onClick={onCancel}>Cancelar turno</ShellDropdownItem>
       </ShellDropdown>
     </div>
   );
@@ -64,15 +69,19 @@ const OverflowMenu = ({ onNoShow, onReschedule }: { onNoShow?: () => void; onRes
 export const TicketCard = ({
   ticket,
   state,
-  selectable,
+  interactive,
   selected,
   onSelect,
   onPrimary,
   onNoShow,
   onReschedule,
+  onCancel,
+  onDragStart,
+  onDragEnd,
 }: TicketCardProps) => {
   const isDone = state === "done";
   const isServing = state === "serving";
+  const canDrag = !!interactive && !isDone;
 
   // Card background/border by state and urgency
   const cardTone = cn(
@@ -81,14 +90,27 @@ export const TicketCard = ({
     isServing && "border-secondary-200 bg-secondary-50 dark:border-secondary-500/30 dark:bg-secondary-500/10",
     !isDone && !isServing && ticket.urgent && "border-error-300 bg-error-50 dark:border-error-500/40 dark:bg-error-500/10",
     !isDone && !isServing && !ticket.urgent && "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900",
-    selectable && "cursor-pointer hover:border-brand-400",
+    canDrag && "cursor-grab hover:border-brand-400 hover:shadow-theme-md active:cursor-grabbing",
     selected && "ring-2 ring-brand-500 border-brand-500",
   );
 
   return (
-    <div className={cardTone} onClick={selectable ? onSelect : undefined}>
+    <div
+      className={cardTone}
+      draggable={canDrag}
+      onDragStart={canDrag ? onDragStart : undefined}
+      onDragEnd={canDrag ? onDragEnd : undefined}
+      onClick={interactive && !isDone ? onSelect : undefined}
+    >
       <div className="flex items-start justify-between">
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-2">
+          {canDrag && (
+            <span className="text-gray-300 dark:text-gray-600" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                <path d="M9 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-1.5 7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-1.5 7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm1.5 4.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+              </svg>
+            </span>
+          )}
           <span className={cn(
             "text-2xl font-bold",
             isServing ? "text-secondary-600 dark:text-secondary-300" : ticket.urgent && !isDone ? "text-error-600" : "text-brand-600 dark:text-brand-400",
@@ -96,7 +118,7 @@ export const TicketCard = ({
             {ticket.numero}
           </span>
         </div>
-        {!isDone && <OverflowMenu onNoShow={onNoShow} onReschedule={onReschedule} />}
+        {!isDone && <OverflowMenu onNoShow={onNoShow} onReschedule={onReschedule} onCancel={onCancel} />}
       </div>
 
       <div className="mt-1">
@@ -114,8 +136,8 @@ export const TicketCard = ({
         </span>
       </div>
 
-      {/* Primary action */}
-      {state === "waiting" && (
+      {/* Primary action — only in interactive (manual) mode */}
+      {interactive && state === "waiting" && (
         <button
           onClick={(e) => { e.stopPropagation(); onPrimary?.(); }}
           className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
@@ -123,7 +145,7 @@ export const TicketCard = ({
           Atender
         </button>
       )}
-      {state === "serving" && (
+      {interactive && state === "serving" && (
         <button
           onClick={(e) => { e.stopPropagation(); onPrimary?.(); }}
           className="mt-4 w-full rounded-lg bg-secondary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-secondary-700"
