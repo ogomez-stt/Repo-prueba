@@ -23,9 +23,9 @@ import {
 const Logo = () => (
   <Link to="/dashboard" className="flex items-center">
     <img
-      src="/images/logo/necto-full.png"
+      src="/images/logo/necto-full.svg"
       alt="NECTO"
-      className="h-9 w-auto"
+      className="h-5 w-auto"
     />
   </Link>
 );
