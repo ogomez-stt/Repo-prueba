@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useLocation } from "react-router";
 import { observer } from "mobx-react-lite";
 import {
   BaseAppSidebar,
@@ -102,7 +102,8 @@ const SidebarFooter = observer(() => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SidebarContent = () => {
-  const isActive = (path: string) => window.location.pathname === path;
+  const { pathname } = useLocation();
+  const isActive = (path: string) => pathname === path;
 
   return (
     <nav className="flex flex-col flex-1">
