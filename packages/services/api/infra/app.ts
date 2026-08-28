@@ -144,33 +144,28 @@ export class SrvApi extends Stack<SrvApiEnv> {
   private async initRouting(): Promise<void> {
     const isDev = SstContext.dev;
 
-    if (!isDev) {
-      // Production: ECS Service registered in CloudMap, routes via VPC Link
-      // The microservice exposes /turnos/* and /queues/* endpoints
-      this.api.gateway.route('ANY /turnos/{proxy+}', {
-        cloudMap: {
-          serviceName: 'turnos-service',
-          namespace: 'turnos',
-        },
-      }, { auth: this.api.jwtAuth });
-
-      this.api.gateway.route('ANY /queues/{proxy+}', {
-        cloudMap: {
-          serviceName: 'turnos-service',
-          namespace: 'turnos',
-        },
-      }, { auth: this.api.jwtAuth });
-    } else {
-      // Dev mode: route to local service via URL proxy
-      const devPort = 8080;
-      this.api.gateway.route('ANY /turnos/{proxy+}', {
-        url: `http://localhost:${devPort}`,
-      }, { auth: this.api.jwtAuth });
-
-      this.api.gateway.route('ANY /queues/{proxy+}', {
-        url: `http://localhost:${devPort}`,
-      }, { auth: this.api.jwtAuth });
+    // In dev mode the microservice runs locally (Bun) and API Gateway cannot
+    // route to localhost. The Fargate/CloudMap routes are only wired in a real
+    // deployment where the ECS service is registered in the CloudMap namespace.
+    if (isDev) {
+      return;
     }
+
+    // Production: ECS Service registered in CloudMap, routes via VPC Link.
+    // The microservice exposes /turnos/* and /queues/* endpoints.
+    this.api.gateway.route('ANY /turnos/{proxy+}', {
+      cloudMap: {
+        serviceName: 'turnos-service',
+        namespace: 'turnos',
+      },
+    }, { auth: this.api.jwtAuth });
+
+    this.api.gateway.route('ANY /queues/{proxy+}', {
+      cloudMap: {
+        serviceName: 'turnos-service',
+        namespace: 'turnos',
+      },
+    }, { auth: this.api.jwtAuth });
   }
 
   /**
@@ -179,11 +174,8 @@ export class SrvApi extends Stack<SrvApiEnv> {
    * Exports the API URL and table name for other stacks to consume.
    */
   private async initRegister(): Promise<void> {
-    // Register API Gateway
+    // Register API Gateway for cross-stack consumption
     this.api.gateway.register(this);
-
-    // Register ECS Cluster
-    this.compute.cluster.register(this);
 
     // DataExport: API config for the frontend
     const apiConfig = new DataExport<{

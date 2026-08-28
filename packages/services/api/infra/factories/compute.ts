@@ -1,7 +1,6 @@
 /// <reference path="../../.sst/platform/config.d.ts" />
 
 import { EcsCluster, type EcsClusterArgs } from '@webiai/sdk.infra/aws/services/EcsCluster';
-import type { WebiAiResourceOptions } from '@webiai/sdk.infra/util/webiai-resource';
 import type { VpcHydrated } from '@webiai/sdk.infra/aws/vpc/Vpc';
 import type { ApiGateway } from '@webiai/sdk.infra/aws/services/ApiGateway';
 import type { AuthorizerRef } from '@webiai/sdk.infra/aws/services/routing';
@@ -37,15 +36,7 @@ export function createCluster(vpc: VpcHydrated) {
     subnets: 'private',
   };
 
-  const opts: WebiAiResourceOptions = {
-    shared: {
-      urnNamespace: ['stt', 'Api'],
-      resourceName: 'Ecs.Cluster',
-      stack: 'SrvApi',
-    },
-  };
-
-  return new EcsCluster('TurnosCluster', args, opts);
+  return new EcsCluster('TurnosCluster', args);
 }
 
 /**
@@ -54,7 +45,7 @@ export function createCluster(vpc: VpcHydrated) {
 export function createLambdaFunctions(config: CreateComputeConfig) {
   // Health check function — simple, no VPC needed
   const healthFn = new sst.aws.Function('HealthCheck', {
-    handler: 'packages/services/api/infra/functions/health.handler',
+    handler: 'infra/functions/health.handler',
     runtime: 'nodejs22.x',
     memory: '128 MB',
     timeout: '10 seconds',
@@ -62,7 +53,7 @@ export function createLambdaFunctions(config: CreateComputeConfig) {
 
   // Encuesta function — reads/writes DynamoDB
   const encuestaFn = new sst.aws.Function('Encuesta', {
-    handler: 'packages/services/api/infra/functions/encuesta.handler',
+    handler: 'infra/functions/encuesta.handler',
     runtime: 'nodejs22.x',
     memory: '256 MB',
     timeout: '30 seconds',

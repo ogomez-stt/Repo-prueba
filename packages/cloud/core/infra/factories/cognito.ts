@@ -90,8 +90,10 @@ export function createCognito(config: CreateCognitoConfig): CognitoResources {
   const userPool = new CognitoUserPool('TurnosUserPool', userPoolArgs, userPoolOpts);
 
   // --- Cognito Domain (hosted UI) ---
+  // Cognito domain names must be lowercase, digits, and hyphens only.
+  const domainName = `turnos-${pulumi.getStack().toLowerCase()}`;
   const domain = new aws.cognito.UserPoolDomain('TurnosDomain', {
-    domain: pulumi.interpolate`turnos-${pulumi.getStack()}`,
+    domain: domainName,
     userPoolId: userPool.id,
   });
 
