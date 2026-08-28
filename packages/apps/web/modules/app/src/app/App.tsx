@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router";
 import { AppShell } from "@/app/AppShell";
 import { DashboardPage } from "@/pages/dashboard";
+import { TurnosPage } from "@/pages/turnos";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
@@ -85,7 +86,7 @@ export default function App() {
           ════════════════════════════════════════════════════════════════════ */}
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/turnos" element={<PlaceholderPage title="Mis Turnos" description="Gestiona tus turnos activos." />} />
+        <Route path="/turnos" element={<TurnosPage />} />
         <Route path="/colas" element={<PlaceholderPage title="Colas" description="Administra las colas de atencion." />} />
         <Route path="/encuestas" element={<PlaceholderPage title="Encuestas" description="Encuestas de satisfaccion." />} />
         <Route path="/agendamiento" element={<PlaceholderPage title="Agenda" description="Vista principal de agendamientos." />} />
