@@ -18,6 +18,9 @@ interface TicketCardProps {
   /** Manual mode: card is interactive (draggable + has primary action) */
   interactive?: boolean;
   selected?: boolean;
+  /** Disable the primary action (e.g. someone is already being served) */
+  primaryDisabled?: boolean;
+  primaryDisabledHint?: string;
   onSelect?: () => void;
   onPrimary?: () => void;
   onNoShow?: () => void;
@@ -71,6 +74,8 @@ export const TicketCard = ({
   state,
   interactive,
   selected,
+  primaryDisabled,
+  primaryDisabledHint,
   onSelect,
   onPrimary,
   onNoShow,
@@ -138,12 +143,18 @@ export const TicketCard = ({
 
       {/* Primary action — only in interactive (manual) mode */}
       {interactive && state === "waiting" && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onPrimary?.(); }}
-          className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
-        >
-          Atender
-        </button>
+        <>
+          <button
+            disabled={primaryDisabled}
+            onClick={(e) => { e.stopPropagation(); if (!primaryDisabled) onPrimary?.(); }}
+            className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Atender
+          </button>
+          {primaryDisabled && primaryDisabledHint && (
+            <p className="mt-1.5 text-center text-xs text-gray-400">{primaryDisabledHint}</p>
+          )}
+        </>
       )}
       {interactive && state === "serving" && (
         <button

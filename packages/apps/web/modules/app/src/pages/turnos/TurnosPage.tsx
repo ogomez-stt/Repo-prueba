@@ -84,8 +84,14 @@ export const TurnosPage = () => {
     done: [],
   };
 
-  const canDrop = (from: ColumnKey, target: ColumnKey) =>
-    from !== target && allowedTargets[from].includes(target);
+  // "Atendiendo" holds at most one ticket (small-business: one at a time).
+  const SERVING_LIMIT = 1;
+
+  const canDrop = (from: ColumnKey, target: ColumnKey) => {
+    if (from === target || !allowedTargets[from].includes(target)) return false;
+    if (target === "serving" && board.serving.length >= SERVING_LIMIT) return false;
+    return true;
+  };
 
   // ── Drag & drop (manual only) ──
   const handleDrop = (target: ColumnKey) => {
@@ -104,6 +110,8 @@ export const TurnosPage = () => {
 
   const movePrimary = (from: ColumnKey, numero: string) => {
     const target: ColumnKey = from === "waiting" ? "serving" : "done";
+    // Enforce single ticket in "Atendiendo".
+    if (target === "serving" && board.serving.length >= SERVING_LIMIT) return;
     setBoard((prev) => {
       const fromList = [...prev[from]];
       const idx = fromList.findIndex((t) => t.numero === numero);
@@ -346,6 +354,8 @@ export const TurnosPage = () => {
                     state={col.state}
                     interactive={isManual}
                     selected={isManual && selected === t.numero}
+                    primaryDisabled={col.key === "waiting" && board.serving.length >= SERVING_LIMIT}
+                    primaryDisabledHint="Termina el turno actual primero"
                     onSelect={() => setSelected(t.numero)}
                     onPrimary={() => movePrimary(col.key, t.numero)}
                     onReschedule={() => setRescheduleTicket(t)}
