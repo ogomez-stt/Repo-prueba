@@ -76,9 +76,20 @@ export const TurnosPage = () => {
 
   const services = ["todos", ...Array.from(new Set(initialBoard.waiting.map((t) => t.servicio)))];
 
+  // Allowed moves per source column (prevents nonsensical cycles):
+  // waiting -> serving | done ; serving -> done only ; done -> nowhere
+  const allowedTargets: Record<ColumnKey, ColumnKey[]> = {
+    waiting: ["serving", "done"],
+    serving: ["done"],
+    done: [],
+  };
+
+  const canDrop = (from: ColumnKey, target: ColumnKey) =>
+    from !== target && allowedTargets[from].includes(target);
+
   // ── Drag & drop (manual only) ──
   const handleDrop = (target: ColumnKey) => {
-    if (!dragged || dragged.from === target) { setDragOver(null); return; }
+    if (!dragged || !canDrop(dragged.from, target)) { setDragOver(null); return; }
     setBoard((prev) => {
       const fromList = [...prev[dragged.from]];
       const idx = fromList.findIndex((t) => t.numero === dragged.numero);
@@ -142,18 +153,52 @@ export const TurnosPage = () => {
         )}
       </div>
 
-      {/* Auto mode banner */}
+      {/* Auto mode banner — shows current ticket + advance button */}
       {!isManual && (
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">Modo automatico activo</p>
-            <p className="text-xs text-brand-600/80 dark:text-brand-300/70">
-              El sistema esta llamando los turnos en orden de llegada (FIFO). Cambia a Manual para gestionar los turnos tu mismo.
-            </p>
+        <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">Modo automatico activo</p>
+                <p className="text-xs text-brand-600/80 dark:text-brand-300/70">
+                  El sistema llama los turnos en orden de llegada (FIFO).
+                </p>
+              </div>
+            </div>
+
+            {/* Current ticket + advance */}
+            <div className="flex items-center gap-4 rounded-xl bg-white px-4 py-3 dark:bg-gray-900">
+              {board.serving.length > 0 ? (
+                <>
+                  <div>
+                    <p className="text-xs text-gray-400">Atendiendo ahora</p>
+                    <p className="text-xl font-bold text-brand-600 dark:text-brand-400">
+                      {board.serving[0].numero}
+                      <span className="ml-2 text-sm font-normal text-gray-500">{board.serving[0].cliente}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => movePrimary("serving", board.serving[0].numero)}
+                    className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                  >
+                    Terminar turno
+                  </button>
+                </>
+              ) : board.waiting.length > 0 ? (
+                <button
+                  onClick={() => movePrimary("waiting", board.waiting[0].numero)}
+                  className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                >
+                  Llamar siguiente ({board.waiting[0].numero})
+                </button>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No hay turnos en cola</p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -181,16 +226,19 @@ export const TurnosPage = () => {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {columnMeta.map((col) => {
           const tickets = columnData(col.key);
-          const isDropTarget = isManual && dragOver === col.key;
+          const isValidTarget = !!dragged && canDrop(dragged.from, col.key);
+          const isInvalidTarget = !!dragged && dragged.from !== col.key && !canDrop(dragged.from, col.key);
+          const isDropTarget = isManual && dragOver === col.key && isValidTarget;
           return (
             <div
               key={col.key}
-              onDragOver={isManual ? (e) => { e.preventDefault(); setDragOver(col.key); } : undefined}
+              onDragOver={isManual && isValidTarget ? (e) => { e.preventDefault(); setDragOver(col.key); } : undefined}
               onDragLeave={isManual ? () => setDragOver((c) => (c === col.key ? null : c)) : undefined}
               onDrop={isManual ? () => handleDrop(col.key) : undefined}
               className={
                 "rounded-2xl p-1 transition-colors " +
-                (isDropTarget ? "bg-brand-50 ring-2 ring-dashed ring-brand-300 dark:bg-brand-500/10" : "")
+                (isDropTarget ? "bg-brand-50 ring-2 ring-dashed ring-brand-300 dark:bg-brand-500/10 " : "") +
+                (isInvalidTarget ? "opacity-50 " : "")
               }
             >
               <div className="mb-3 flex items-center justify-between px-1">
