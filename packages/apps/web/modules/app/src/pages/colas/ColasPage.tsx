@@ -1,40 +1,35 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { Select } from "@/elements/form/select";
 import { Notification } from "@/elements/ui/notification";
-import { QueueCard, type Queue } from "./components/QueueCard";
-
-const initialQueues: Queue[] = [
-  { id: "1", nombre: "Consulta general", color: "bg-brand-500", esperando: 5, tiempoProm: 14, atendiendo: "A-042", activa: true },
-  { id: "2", nombre: "Laboratorio", color: "bg-secondary-500", esperando: 4, tiempoProm: 25, atendiendo: "L-018", activa: true },
-  { id: "3", nombre: "Farmacia", color: "bg-accent-500", esperando: 0, tiempoProm: 6, atendiendo: null, activa: false },
-];
-
-const colorOptions = ["bg-brand-500", "bg-secondary-500", "bg-accent-500", "bg-warning-500", "bg-success-500"];
+import { queuesStore, type Queue, type AttentionMode } from "@/stores";
+import { QueueCard } from "./components/QueueCard";
 
 interface QueueForm {
   nombre: string;
   servicio: string;
-  modo: string;
+  modo: AttentionMode;
   tiempo: string;
 }
 
 const emptyForm: QueueForm = { nombre: "", servicio: "general", modo: "auto", tiempo: "10" };
 
-export const ColasPage = () => {
+export const ColasPage = observer(() => {
   const navigate = useNavigate();
-  const [queues, setQueues] = useState<Queue[]>(initialQueues);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<QueueForm>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const activeCount = queues.filter((q) => q.activa).length;
-  const totalWaiting = queues.reduce((sum, q) => sum + (q.activa ? q.esperando : 0), 0);
+  const queues = queuesStore.queues;
+  const activeCount = queuesStore.activeCount;
+  const totalWaiting = queuesStore.totalWaiting;
+
   const subtitle = queues.length === 0
     ? "Aun no tienes colas"
     : `${activeCount} ${activeCount === 1 ? "cola activa" : "colas activas"} · ${totalWaiting} ${totalWaiting === 1 ? "persona esperando" : "personas esperando"} en total`;
@@ -47,39 +42,40 @@ export const ColasPage = () => {
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (q: Queue) => {
     setEditingId(q.id);
-    setForm({ nombre: q.nombre, servicio: "general", modo: "auto", tiempo: String(q.tiempoProm) });
+    setForm({ nombre: q.nombre, servicio: q.servicio, modo: q.mode, tiempo: String(q.tiempoProm) });
     setModalOpen(true);
   };
 
   const saveQueue = () => {
     if (!form.nombre.trim()) return;
     if (editingId) {
-      setQueues((prev) => prev.map((q) => q.id === editingId ? { ...q, nombre: form.nombre, tiempoProm: Number(form.tiempo) || q.tiempoProm } : q));
+      queuesStore.updateQueue(editingId, {
+        nombre: form.nombre,
+        servicio: form.servicio,
+        mode: form.modo,
+        tiempoProm: Number(form.tiempo) || 10,
+      });
       showToast("Cola actualizada");
     } else {
-      const color = colorOptions[queues.length % colorOptions.length];
-      setQueues((prev) => [...prev, {
-        id: crypto.randomUUID(),
+      queuesStore.createQueue({
         nombre: form.nombre,
-        color,
-        esperando: 0,
+        servicio: form.servicio,
+        mode: form.modo,
         tiempoProm: Number(form.tiempo) || 10,
-        atendiendo: null,
-        activa: true,
-      }]);
+      });
       showToast("Cola creada");
     }
     setModalOpen(false);
   };
 
   const toggleQueue = (id: string, active: boolean) => {
-    setQueues((prev) => prev.map((q) => q.id === id ? { ...q, activa: active } : q));
+    queuesStore.toggleQueue(id, active);
     showToast(active ? "Cola reanudada" : "Cola pausada");
   };
 
   const confirmDelete = () => {
     if (!deleteId) return;
-    setQueues((prev) => prev.filter((q) => q.id !== deleteId));
+    queuesStore.deleteQueue(deleteId);
     setDeleteId(null);
     showToast("Cola eliminada");
   };
@@ -94,6 +90,13 @@ export const ColasPage = () => {
   return (
     <>
       <PageMeta title="Colas" description="Administra tus colas de atencion" />
+
+      {/* Toast (top-center) */}
+      {toast && (
+        <div className="fixed left-1/2 top-6 z-99999 -translate-x-1/2">
+          <Notification variant="success" title={toast} />
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -126,8 +129,9 @@ export const ColasPage = () => {
             <QueueCard
               key={q.id}
               queue={q}
+              saturation={queuesStore.saturationOf(q)}
               onToggle={(active) => toggleQueue(q.id, active)}
-              onManage={() => navigate(`/turnos?cola=${encodeURIComponent(q.nombre)}`)}
+              onManage={() => navigate(`/turnos?cola=${q.id}`)}
               onShare={() => shareQueue(q)}
               onEdit={() => openEdit(q)}
               onDelete={() => setDeleteId(q.id)}
@@ -169,7 +173,7 @@ export const ColasPage = () => {
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Modo de atencion</label>
               <Select
                 defaultValue={form.modo}
-                onChange={(v) => setForm({ ...form, modo: v })}
+                onChange={(v) => setForm({ ...form, modo: v as AttentionMode })}
                 options={[
                   { value: "auto", label: "Automatico" },
                   { value: "manual", label: "Manual" },
@@ -212,15 +216,8 @@ export const ColasPage = () => {
           </div>
         </div>
       </Modal>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-99999">
-          <Notification variant="success" title={toast} />
-        </div>
-      )}
     </>
   );
-};
+});
 
 export default ColasPage;

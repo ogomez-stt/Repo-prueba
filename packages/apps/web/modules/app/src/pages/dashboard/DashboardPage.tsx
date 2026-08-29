@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { useModal } from "@/hooks/useModal";
 import { MetricCard } from "@/compositions/metric-card";
+import { queuesStore } from "@/stores";
 import {
   GroupIcon,
   TimeIcon,
@@ -12,7 +14,7 @@ import {
 } from "@/icons";
 import { CurrentTicketCard } from "./components/CurrentTicketCard";
 import { DashboardCharts } from "./components/DashboardCharts";
-import { LiveQueueTable } from "./components/LiveQueueTable";
+import { QueuesOverview } from "./components/QueuesOverview";
 import { ActivityFeed } from "./components/ActivityFeed";
 
 const WhatsAppDot = () => (
@@ -24,8 +26,9 @@ const WhatsAppDot = () => (
 
 /**
  * DashboardPage — NECTO real-time queue operations control panel.
+ * Reads live data from the shared queues store.
  */
-export const DashboardPage = () => {
+export const DashboardPage = observer(() => {
   const { isOpen, openModal, closeModal } = useModal();
   const [pendingAction, setPendingAction] = useState<string>("");
 
@@ -33,6 +36,10 @@ export const DashboardPage = () => {
     setPendingAction(label);
     openModal();
   };
+
+  const totalWaiting = queuesStore.totalWaiting;
+  const avgWait = queuesStore.avgWaitMin;
+  const emitted = queuesStore.totalEmittedToday;
 
   return (
     <>
@@ -69,25 +76,21 @@ export const DashboardPage = () => {
             layout="horizontal"
             icon={<GroupIcon className="size-6" />}
             title="Turnos en espera"
-            value="42"
-            change="12%"
-            trend="up"
+            value={String(totalWaiting)}
             iconSize="w-14 h-14"
           />
           <MetricCard
             layout="horizontal"
             icon={<TimeIcon className="size-6" />}
             title="Tiempo esp. promedio"
-            value="14m"
-            change="2m"
-            trend="down"
+            value={avgWait > 0 ? `${avgWait}m` : "--"}
             iconSize="w-14 h-14"
           />
           <MetricCard
             layout="horizontal"
             icon={<BoxIconLine className="size-6" />}
             title="Tickets emitidos hoy"
-            value="284"
+            value={String(emitted)}
             iconSize="w-14 h-14"
           />
           <MetricCard
@@ -102,19 +105,19 @@ export const DashboardPage = () => {
         </div>
       </div>
 
+      {/* Per-queue status */}
+      <div className="mt-6">
+        <QueuesOverview />
+      </div>
+
       {/* Statistics */}
       <div className="mt-6">
         <DashboardCharts />
       </div>
 
-      {/* Live operation: queue + activity */}
-      <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <LiveQueueTable onAction={confirmAction} />
-        </div>
-        <div className="xl:col-span-1">
-          <ActivityFeed />
-        </div>
+      {/* Activity feed */}
+      <div className="mt-6">
+        <ActivityFeed />
       </div>
 
       {/* Confirmation modal */}
@@ -134,6 +137,6 @@ export const DashboardPage = () => {
       </Modal>
     </>
   );
-};
+});
 
 export default DashboardPage;

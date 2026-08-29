@@ -1,35 +1,18 @@
 import { useState } from "react";
 import { Switch } from "@/elements/form/switch";
 import { ShellDropdown, ShellDropdownItem } from "@/shell/header/ShellDropdown";
+import type { Queue, Saturation } from "@/stores";
 import { cn } from "@/utils";
-
-export type Saturation = "ok" | "busy" | "full";
-
-export interface Queue {
-  id: string;
-  nombre: string;
-  color: string;         // tailwind bg class for the dot, e.g. "bg-brand-500"
-  esperando: number;
-  tiempoProm: number;    // minutes
-  atendiendo: string | null;
-  activa: boolean;
-}
 
 interface QueueCardProps {
   queue: Queue;
+  saturation: Saturation;
   onToggle: (active: boolean) => void;
   onManage: () => void;
   onShare: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
-
-const saturationOf = (q: Queue): Saturation => {
-  if (!q.activa) return "ok";
-  if (q.esperando >= 8) return "full";
-  if (q.esperando >= 4) return "busy";
-  return "ok";
-};
 
 const saturationMeta: Record<Saturation, { dot: string; label: string; text: string }> = {
   ok: { dot: "bg-success-500", label: "Fluyendo bien", text: "text-success-600" },
@@ -40,11 +23,13 @@ const saturationMeta: Record<Saturation, { dot: string; label: string; text: str
 /**
  * QueueCard — Visual overview card for a single queue.
  */
-export const QueueCard = ({ queue, onToggle, onManage, onShare, onEdit, onDelete }: QueueCardProps) => {
+export const QueueCard = ({ queue, saturation, onToggle, onManage, onShare, onEdit, onDelete }: QueueCardProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const sat = saturationOf(queue);
-  const meta = saturationMeta[sat];
+  const meta = saturationMeta[saturation];
   const item = "block w-full rounded-md px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5";
+
+  const esperando = queue.waiting.length;
+  const atendiendo = queue.serving.length > 0 ? queue.serving[0].numero : null;
 
   return (
     <div
@@ -91,12 +76,12 @@ export const QueueCard = ({ queue, onToggle, onManage, onShare, onEdit, onDelete
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/[0.03]">
           <p className="text-xs text-gray-400">Esperando</p>
-          <p className="text-xl font-bold text-gray-800 dark:text-white/90">{queue.esperando}</p>
+          <p className="text-xl font-bold text-gray-800 dark:text-white/90">{esperando}</p>
         </div>
         <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/[0.03]">
           <p className="text-xs text-gray-400">Tiempo prom.</p>
           <p className="text-xl font-bold text-gray-800 dark:text-white/90">
-            {queue.esperando > 0 ? `~${queue.tiempoProm}m` : "--"}
+            {esperando > 0 ? `~${queue.tiempoProm}m` : "--"}
           </p>
         </div>
       </div>
@@ -104,8 +89,8 @@ export const QueueCard = ({ queue, onToggle, onManage, onShare, onEdit, onDelete
       {/* Current ticket */}
       <div className="mt-3 flex items-center justify-between rounded-xl border border-dashed border-gray-200 px-3 py-2 dark:border-gray-800">
         <span className="text-xs text-gray-400">Atendiendo</span>
-        <span className={cn("text-sm font-semibold", queue.atendiendo ? "text-secondary-600 dark:text-secondary-300" : "text-gray-400")}>
-          {queue.atendiendo ?? "—"}
+        <span className={cn("text-sm font-semibold", atendiendo ? "text-secondary-600 dark:text-secondary-300" : "text-gray-400")}>
+          {atendiendo ?? "—"}
         </span>
       </div>
 

@@ -4,16 +4,16 @@ import { cn } from "@/utils";
 
 export type TicketState = "waiting" | "serving" | "done";
 
-export interface Ticket {
+export interface CardTicket {
   numero: string;
   cliente: string;
-  servicio: string;
+  servicio?: string;
   espera: string;
   urgent?: boolean;
 }
 
 interface TicketCardProps {
-  ticket: Ticket;
+  ticket: CardTicket;
   state: TicketState;
   /** Manual mode: card is interactive (draggable + has primary action) */
   interactive?: boolean;
@@ -128,7 +128,7 @@ export const TicketCard = ({
 
       <div className="mt-1">
         <p className="text-base font-medium text-gray-800 dark:text-white/90">{ticket.cliente}</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{ticket.servicio}</p>
+        {ticket.servicio && <p className="text-sm text-gray-500 dark:text-gray-400">{ticket.servicio}</p>}
       </div>
 
       <div className="mt-3 flex items-center justify-between">
