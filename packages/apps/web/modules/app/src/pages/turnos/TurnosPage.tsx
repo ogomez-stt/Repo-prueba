@@ -113,6 +113,40 @@ export const TurnosPage = () => {
     });
   };
 
+  /**
+   * Auto mode: finish the current ticket and immediately call the next one
+   * in line (FIFO) into "Atendiendo" — no manual button needed.
+   */
+  const finishAndAdvance = () => {
+    setBoard((prev) => {
+      const serving = [...prev.serving];
+      const waiting = [...prev.waiting];
+      const done = [...prev.done];
+
+      // Complete the one currently being served
+      if (serving.length > 0) {
+        const [current] = serving.splice(0, 1);
+        done.push({ ...current, urgent: false });
+      }
+      // Auto-call the next waiting ticket (FIFO)
+      if (waiting.length > 0) {
+        const [next] = waiting.splice(0, 1);
+        serving.push({ ...next, urgent: false, espera: "0 min" });
+      }
+      return { waiting, serving, done };
+    });
+  };
+
+  /** Auto mode: start serving the first waiting ticket when nobody is in service. */
+  const startNextAuto = () => {
+    setBoard((prev) => {
+      if (prev.serving.length > 0 || prev.waiting.length === 0) return prev;
+      const waiting = [...prev.waiting];
+      const [next] = waiting.splice(0, 1);
+      return { ...prev, waiting, serving: [{ ...next, urgent: false, espera: "0 min" }] };
+    });
+  };
+
   const removeTicket = (numero: string) => {
     setBoard((prev) => ({
       waiting: prev.waiting.filter((t) => t.numero !== numero),
@@ -175,26 +209,33 @@ export const TurnosPage = () => {
               {board.serving.length > 0 ? (
                 <>
                   <div>
-                    <p className="text-xs text-gray-400">Atendiendo ahora</p>
+                    <p className="text-xs text-gray-400">
+                      Atendiendo ahora{board.waiting.length > 0 && (
+                        <span className="ml-1 text-gray-400">· siguiente {board.waiting[0].numero}</span>
+                      )}
+                    </p>
                     <p className="text-xl font-bold text-brand-600 dark:text-brand-400">
                       {board.serving[0].numero}
                       <span className="ml-2 text-sm font-normal text-gray-500">{board.serving[0].cliente}</span>
                     </p>
                   </div>
                   <button
-                    onClick={() => movePrimary("serving", board.serving[0].numero)}
+                    onClick={finishAndAdvance}
                     className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
                   >
                     Terminar turno
                   </button>
                 </>
               ) : board.waiting.length > 0 ? (
-                <button
-                  onClick={() => movePrimary("waiting", board.waiting[0].numero)}
-                  className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
-                >
-                  Llamar siguiente ({board.waiting[0].numero})
-                </button>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Listo para el siguiente</p>
+                  <button
+                    onClick={startNextAuto}
+                    className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                  >
+                    Iniciar cola ({board.waiting[0].numero})
+                  </button>
+                </div>
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400">No hay turnos en cola</p>
               )}
