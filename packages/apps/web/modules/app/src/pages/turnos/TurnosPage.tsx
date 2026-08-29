@@ -167,25 +167,66 @@ export const TurnosPage = () => {
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
       </div>
 
-      {/* Mode + primary action */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Modo:</span>
-          <ButtonsGroup
-            items={[
-              { label: "Automatico", onClick: () => setMode("auto") },
-              { label: "Manual", onClick: () => setMode("manual") },
-            ]}
-            variant="secondary"
-          />
-        </div>
-        {/* Llamar siguiente only in manual mode */}
-        {isManual && (
-          <button className="rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600">
-            Llamar siguiente
-          </button>
-        )}
+      {/* Mode toggle */}
+      <div className="mb-5 flex items-center gap-3">
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Modo:</span>
+        <ButtonsGroup
+          items={[
+            { label: "Automatico", onClick: () => setMode("auto") },
+            { label: "Manual", onClick: () => setMode("manual") },
+          ]}
+          variant="secondary"
+        />
       </div>
+
+      {/* Manual mode banner — current ticket + call next / finish */}
+      {isManual && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {board.serving.length > 0 ? (
+                <>
+                  <p className="text-xs text-gray-400">
+                    Atendiendo ahora{board.waiting.length > 0 && (
+                      <span className="ml-1">· siguiente {board.waiting[0].numero}</span>
+                    )}
+                  </p>
+                  <p className="text-xl font-bold text-secondary-600 dark:text-secondary-300">
+                    {board.serving[0].numero}
+                    <span className="ml-2 text-sm font-normal text-gray-500">{board.serving[0].cliente}</span>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400">Sin turno en atencion</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {board.waiting.length > 0
+                      ? `Siguiente en fila: ${board.waiting[0].numero}`
+                      : "No hay turnos en cola"}
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={startNextAuto}
+                disabled={board.serving.length > 0 || board.waiting.length === 0}
+                className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Llamar siguiente
+              </button>
+              <button
+                onClick={() => board.serving.length > 0 && movePrimary("serving", board.serving[0].numero)}
+                disabled={board.serving.length === 0}
+                className="rounded-lg bg-secondary-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-secondary-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Terminar turno
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auto mode banner — shows current ticket + advance button */}
       {!isManual && (
