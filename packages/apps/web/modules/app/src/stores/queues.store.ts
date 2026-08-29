@@ -28,6 +28,19 @@ export interface Queue {
   done: Ticket[];
 }
 
+export type Sentiment = "positive" | "neutral" | "negative";
+
+export interface Survey {
+  id: string;
+  cliente: string;
+  queueId: string;
+  queueName: string;
+  rating: number;       // 1-5
+  comentario: string;
+  fecha: string;        // display date
+  daysAgo: number;      // for trend ordering
+}
+
 const URGENT_THRESHOLD = 10; // minutes
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -223,7 +236,107 @@ class QueuesStore {
     const [current] = q.serving.splice(0, 1);
     q.done.push(current);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SURVEYS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  surveys: Survey[] = seedSurveys();
+
+  sentimentOf(rating: number): Sentiment {
+    if (rating >= 4) return "positive";
+    if (rating === 3) return "neutral";
+    return "negative";
+  }
+
+  get avgRating(): number {
+    if (this.surveys.length === 0) return 0;
+    return this.surveys.reduce((s, x) => s + x.rating, 0) / this.surveys.length;
+  }
+
+  get totalResponses(): number {
+    return this.surveys.length;
+  }
+
+  /** Response rate: surveys / total tickets that were completed. */
+  get responseRate(): number {
+    const completed = this.totalDoneToday + this.surveys.length;
+    if (completed === 0) return 0;
+    return Math.round((this.surveys.length / completed) * 100);
+  }
+
+  /** Rating distribution [count5, count4, count3, count2, count1]. */
+  get ratingDistribution(): number[] {
+    const dist = [0, 0, 0, 0, 0]; // index 0 = 5 stars
+    for (const s of this.surveys) dist[5 - s.rating]++;
+    return dist;
+  }
+
+  /** Average rating per queue name. */
+  get avgByQueue(): { name: string; avg: number }[] {
+    const map = new Map<string, { sum: number; n: number }>();
+    for (const s of this.surveys) {
+      const e = map.get(s.queueName) ?? { sum: 0, n: 0 };
+      e.sum += s.rating; e.n += 1;
+      map.set(s.queueName, e);
+    }
+    return [...map.entries()].map(([name, e]) => ({ name, avg: e.n ? e.sum / e.n : 0 }));
+  }
+
+  /** Rating trend over recent days (oldest first). */
+  get ratingTrend(): { day: string; avg: number }[] {
+    const buckets = new Map<number, { sum: number; n: number }>();
+    for (const s of this.surveys) {
+      const e = buckets.get(s.daysAgo) ?? { sum: 0, n: 0 };
+      e.sum += s.rating; e.n += 1;
+      buckets.set(s.daysAgo, e);
+    }
+    const days = [6, 5, 4, 3, 2, 1, 0];
+    return days.map((d) => {
+      const e = buckets.get(d);
+      const labels = ["Hoy", "Ayer", "-2d", "-3d", "-4d", "-5d", "-6d"];
+      return { day: labels[d], avg: e && e.n ? Number((e.sum / e.n).toFixed(1)) : 0 };
+    }).reverse();
+  }
+
+  get lowRatingSurveys(): Survey[] {
+    return this.surveys.filter((s) => s.rating <= 2);
+  }
+
+  /** Frequent topics from comments (naive word frequency + sentiment). */
+  get topics(): { word: string; count: number; sentiment: "positive" | "negative" }[] {
+    const positive = new Set(["rapido", "amable", "excelente", "bueno", "atento", "eficiente"]);
+    const negative = new Set(["lento", "espera", "demora", "malo", "grosero", "desorganizado"]);
+    const counts = new Map<string, number>();
+    for (const s of this.surveys) {
+      for (const raw of s.comentario.toLowerCase().split(/[^a-zñáéíóú]+/)) {
+        if (raw.length < 4) continue;
+        if (positive.has(raw) || negative.has(raw)) counts.set(raw, (counts.get(raw) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([word, count]) => ({
+        word,
+        count,
+        sentiment: positive.has(word) ? "positive" as const : "negative" as const,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }
 }
+
+const seedSurveys = (): Survey[] => [
+  { id: "s1", cliente: "Maria Gonzalez", queueId: "1", queueName: "Consulta general", rating: 5, comentario: "Atencion muy rapida y amable, excelente servicio", fecha: "Hoy 10:24", daysAgo: 0 },
+  { id: "s2", cliente: "Carlos Mendoza", queueId: "2", queueName: "Laboratorio", rating: 2, comentario: "La espera fue muy lenta, demora demasiado", fecha: "Hoy 09:50", daysAgo: 0 },
+  { id: "s3", cliente: "Ana Silva", queueId: "1", queueName: "Consulta general", rating: 4, comentario: "Todo bien, personal amable", fecha: "Ayer 16:10", daysAgo: 1 },
+  { id: "s4", cliente: "Pedro Ramirez", queueId: "3", queueName: "Farmacia", rating: 5, comentario: "Rapido y eficiente, muy bueno", fecha: "Ayer 14:30", daysAgo: 1 },
+  { id: "s5", cliente: "Lucia Torres", queueId: "2", queueName: "Laboratorio", rating: 1, comentario: "Muy lento, la espera fue horrible", fecha: "-2d 11:05", daysAgo: 2 },
+  { id: "s6", cliente: "Diego Rojas", queueId: "1", queueName: "Consulta general", rating: 4, comentario: "Buen servicio, atento", fecha: "-2d 10:00", daysAgo: 2 },
+  { id: "s7", cliente: "Sofia Diaz", queueId: "3", queueName: "Farmacia", rating: 5, comentario: "Excelente, muy amable", fecha: "-3d 15:20", daysAgo: 3 },
+  { id: "s8", cliente: "Marta Ruiz", queueId: "1", queueName: "Consulta general", rating: 3, comentario: "Normal, nada especial", fecha: "-4d 12:00", daysAgo: 4 },
+  { id: "s9", cliente: "Jorge Nieto", queueId: "2", queueName: "Laboratorio", rating: 2, comentario: "Espera larga, mejorar la demora", fecha: "-5d 09:15", daysAgo: 5 },
+  { id: "s10", cliente: "Elena Vargas", queueId: "3", queueName: "Farmacia", rating: 5, comentario: "Rapido, excelente atencion", fecha: "-6d 17:40", daysAgo: 6 },
+];
 
 export const queuesStore = new QueuesStore();
 export { QueuesStore };
