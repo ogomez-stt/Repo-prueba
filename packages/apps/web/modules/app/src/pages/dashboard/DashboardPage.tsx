@@ -16,6 +16,9 @@ import { CurrentTicketCard } from "./components/CurrentTicketCard";
 import { DashboardCharts } from "./components/DashboardCharts";
 import { QueuesOverview } from "./components/QueuesOverview";
 import { ActivityFeed } from "./components/ActivityFeed";
+import { ExportReportModal } from "./components/ExportReportModal";
+import { ConfigureDisplayModal } from "./components/ConfigureDisplayModal";
+import { Notification } from "@/elements/ui/notification";
 
 const WhatsAppDot = () => (
   <span className="relative flex h-2.5 w-2.5">
@@ -31,10 +34,18 @@ const WhatsAppDot = () => (
 export const DashboardPage = observer(() => {
   const { isOpen, openModal, closeModal } = useModal();
   const [pendingAction, setPendingAction] = useState<string>("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [displayOpen, setDisplayOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const confirmAction = (label: string) => {
     setPendingAction(label);
     openModal();
+  };
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
   };
 
   const totalWaiting = queuesStore.totalWaiting;
@@ -62,8 +73,8 @@ export const DashboardPage = observer(() => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">Exportar Reporte</Button>
-          <Button size="sm">Configurar Display</Button>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>Exportar Reporte</Button>
+          <Button size="sm" onClick={() => setDisplayOpen(true)}>Configurar Display</Button>
         </div>
       </div>
 
@@ -119,6 +130,21 @@ export const DashboardPage = observer(() => {
       <div className="mt-6">
         <ActivityFeed />
       </div>
+
+      {/* Export report + configure display modals */}
+      <ExportReportModal
+        isOpen={exportOpen}
+        onClose={() => setExportOpen(false)}
+        onSent={(via, destino) => showToast(`Reporte enviado por ${via} a ${destino}`)}
+      />
+      <ConfigureDisplayModal isOpen={displayOpen} onClose={() => setDisplayOpen(false)} />
+
+      {/* Toast (top-center) */}
+      {toast && (
+        <div className="fixed left-1/2 top-6 z-99999 -translate-x-1/2">
+          <Notification variant="success" title={toast} />
+        </div>
+      )}
 
       {/* Confirmation modal */}
       <Modal isOpen={isOpen} onClose={closeModal} showCloseButton={false} className="max-w-[440px] p-6 lg:p-8">
