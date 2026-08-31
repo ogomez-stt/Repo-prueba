@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
+import { queuesStore } from "@/stores";
 import { AppShell } from "@/app/AppShell";
 import { DashboardPage } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
@@ -81,6 +83,11 @@ import { AuthPageLayout } from "@/layouts/auth";
  * @kgId d91162d0d213
  */
 export default function App() {
+  // Load queues from the backend once on startup (falls back to local data).
+  useEffect(() => {
+    queuesStore.loadQueues();
+  }, []);
+
   return (
     <Routes>
       {/* ════════════════════════════════════════════════════════════════════

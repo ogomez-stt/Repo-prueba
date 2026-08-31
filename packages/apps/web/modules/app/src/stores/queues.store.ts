@@ -1,4 +1,5 @@
-import { makeAutoObservable } from "mobx";
+import { makeAutoObservable, runInAction } from "mobx";
+import { queuesApi } from "@/services/queues.api";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -84,8 +85,55 @@ const COLOR_OPTIONS = ["bg-brand-500", "bg-secondary-500", "bg-accent-500", "bg-
 class QueuesStore {
   queues: Queue[] = seed();
 
+  /** True once the backend has answered at least once; falls back to seed data otherwise. */
+  apiConnected = false;
+  loading = false;
+
   constructor() {
     makeAutoObservable(this);
+  }
+
+  // ── Backend sync ──
+  /** Load all queues from the API. Falls back silently to seed data on failure. */
+  async loadQueues(): Promise<void> {
+    this.loading = true;
+    try {
+      const queues = await queuesApi.list();
+      runInAction(() => {
+        this.queues = queues;
+        this.apiConnected = true;
+      });
+    } catch (err) {
+      // Backend not reachable — keep working with local (seed) data.
+      console.warn("[queuesStore] API no disponible, usando datos locales:", err);
+    } finally {
+      runInAction(() => {
+        this.loading = false;
+      });
+    }
+  }
+
+  /** Re-fetch a single queue and merge it into local state. */
+  private async refreshQueue(id: string): Promise<void> {
+    if (!this.apiConnected) return;
+    try {
+      const fresh = await queuesApi.get(id);
+      if (!fresh) return;
+      runInAction(() => {
+        const idx = this.queues.findIndex((q) => q.id === id);
+        if (idx !== -1) this.queues[idx] = fresh;
+      });
+    } catch (err) {
+      console.warn("[queuesStore] refreshQueue fallo:", err);
+    }
+  }
+
+  /** Fire an API call in the background; on success reconcile the affected queue. */
+  private sync(queueId: string | null, call: Promise<unknown>): void {
+    if (!this.apiConnected) return;
+    call
+      .then(() => (queueId ? this.refreshQueue(queueId) : this.loadQueues()))
+      .catch((err) => console.warn("[queuesStore] sync fallo:", err));
   }
 
   // ── Lookups ──
@@ -158,6 +206,8 @@ class QueuesStore {
       serving: [],
       done: [],
     });
+    // API assigns the real id → reload the full list to reconcile.
+    this.sync(null, queuesApi.create(data));
   }
 
   updateQueue(id: string, data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number }): void {
@@ -167,20 +217,24 @@ class QueuesStore {
     if (data.servicio !== undefined) q.servicio = data.servicio;
     if (data.mode !== undefined) q.mode = data.mode;
     if (data.tiempoProm !== undefined) q.tiempoProm = data.tiempoProm;
+    this.sync(id, queuesApi.update(id, data));
   }
 
   deleteQueue(id: string): void {
     this.queues = this.queues.filter((q) => q.id !== id);
+    this.sync(null, queuesApi.remove(id));
   }
 
   toggleQueue(id: string, active: boolean): void {
     const q = this.getQueue(id);
     if (q) q.activa = active;
+    this.sync(id, queuesApi.update(id, { activa: active }));
   }
 
   setMode(id: string, mode: AttentionMode): void {
     const q = this.getQueue(id);
     if (q) q.mode = mode;
+    this.sync(id, queuesApi.update(id, { mode }));
   }
 
   // ── Ticket operations (within a queue) ──
@@ -198,6 +252,7 @@ class QueuesStore {
     if (idx === -1) return;
     const [moved] = fromList.splice(idx, 1);
     this.col(q, to).push(to === "done" ? { ...moved } : moved);
+    this.sync(queueId, queuesApi.moveTicket(queueId, numero, to));
   }
 
   removeTicket(queueId: string, numero: string): void {
@@ -205,6 +260,7 @@ class QueuesStore {
     if (!q) return;
     q.waiting = q.waiting.filter((t) => t.numero !== numero);
     q.serving = q.serving.filter((t) => t.numero !== numero);
+    this.sync(queueId, queuesApi.removeTicket(queueId, numero));
   }
 
   /** Auto: complete current serving and pull next waiting into serving. */
@@ -219,6 +275,7 @@ class QueuesStore {
       const [next] = q.waiting.splice(0, 1);
       q.serving.push({ ...next, espera: "0 min", waitedMin: 0 });
     }
+    this.sync(queueId, queuesApi.finish(queueId, true));
   }
 
   /** Start serving the first waiting ticket if none is being served. */
@@ -227,6 +284,7 @@ class QueuesStore {
     if (!q || q.serving.length > 0 || q.waiting.length === 0) return;
     const [next] = q.waiting.splice(0, 1);
     q.serving.push({ ...next, espera: "0 min", waitedMin: 0 });
+    this.sync(queueId, queuesApi.callNext(queueId));
   }
 
   /** Complete current serving without auto-calling next (manual). */
@@ -235,6 +293,7 @@ class QueuesStore {
     if (!q || q.serving.length === 0) return;
     const [current] = q.serving.splice(0, 1);
     q.done.push(current);
+    this.sync(queueId, queuesApi.finish(queueId, false));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
