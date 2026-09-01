@@ -1,19 +1,36 @@
-# Sistema de Turnos
+# NECTO — Sistema de Turnos
 
-Sistema de gestion de turnos multi-proposito. Permite administrar colas de atencion para cualquier tipo de servicio (hospitales, restaurantes, oficinas, etc.).
+Sistema de gestion de turnos para negocios pequeños (hospitales, restaurantes, escuelas, oficinas, etc.). El cliente final normalmente NO usa NECTO directamente: interactua con un **bot de WhatsApp** conectado al sistema. El dueño del negocio administra los turnos desde este panel.
 
 ## Descripcion
 
-El sistema tiene dos roles principales:
+Actores del sistema:
 
-- **Administrador** — Crea y gestiona colas de atencion. Puede crear, llamar, completar, reordenar y cancelar turnos.
-- **Usuario** — Se une a una cola, crea su turno, puede cancelarlo y al finalizar la atencion completa una encuesta de satisfaccion.
+- **Dueño / operador** — Administra colas de atencion y turnos desde el panel: crear/editar/pausar colas, llamar y completar turnos (modo automatico o manual), reordenar por drag-and-drop, marcar no-show, y ver estadisticas y encuestas.
+- **Bot de WhatsApp** — Crea turnos automaticamente cuando un cliente los solicita (mismo endpoint que la vista de operador).
+- **Cliente final** — Recibe avisos por WhatsApp y, al terminar el servicio, abre un link publico para calificar su experiencia.
+
+## Vistas principales
+
+| Ruta | Vista | Descripcion |
+|------|-------|-------------|
+| `/dashboard` | Panel de control | KPIs, turno en atencion, actividad y overview de colas |
+| `/turnos` | Mis Turnos | Atencion en vivo (modo auto/manual, drag-and-drop, no-show) |
+| `/recepcion` | Crear turno | Vista de operador: elige cola, campos dinamicos por cola, telefono obligatorio |
+| `/colas` | Colas | CRUD de colas + editor de campos personalizados por cola |
+| `/encuestas` | Encuestas | Dashboard de satisfaccion + configuracion de la vista publica de encuesta |
+| `/display` | Pantalla de sala | Pantalla fullscreen para TV (`?cola=<id>&sound=1`) |
+| `/s/:token` | Encuesta (publica) | Vista que abre el cliente desde el link de WhatsApp para calificar |
+
+### Campos personalizados por cola
+
+Cada cola define que datos se piden al crear un turno (ademas de nombre y telefono). Los campos son configurables: texto, texto largo, numero o seleccion, con opcion de obligatorio. Asi un restaurante pide "Pedido/Modalidad" y una clinica "Motivo/Documento", sin cambiar codigo. El bot de WhatsApp y la vista de operador comparten el mismo contrato.
 
 ## Stack Tecnologico
 
 | Capa | Tecnologia |
 |------|-----------|
-| Frontend | React 19 + Vite + TypeScript |
+| Frontend | React 18 + Vite + TypeScript + MobX |
 | Backend | Express + TypeScript (Bun runtime) |
 | Base de datos | DynamoDB (single-table design) |
 | Autenticacion | AWS Cognito (User Pool + JWT) |
@@ -30,30 +47,67 @@ packages/
 ├── cloud/core/           Infraestructura compartida (VPC, Cognito)
 ├── services/api/         Backend (API Gateway, Lambda, Fargate, DynamoDB)
 │   └── modules/service/  Microservicio Express
+│       └── src/
+│           ├── controllers/   Health, Queues, Turnos
+│           ├── services/       TurnosDAO (acceso single-table)
+│           └── endpoints.ts    Registro de rutas /queues y /queues/:id/turnos
 └── apps/web/             Frontend
-    └── modules/app/      React SPA
+    └── modules/app/
+        └── src/
+            ├── pages/         dashboard, turnos, recepcion, colas, encuestas, display, survey
+            ├── stores/        queues.store.ts (MobX, fuente de verdad)
+            └── services/      queues.api.ts (cliente fetch al backend)
 ```
 
+### API (backend)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/queues` | Lista colas con sus turnos (waiting/serving/done) |
+| POST | `/queues` | Crea una cola (con campos personalizados) |
+| PATCH | `/queues/:id` | Actualiza una cola |
+| DELETE | `/queues/:id` | Elimina una cola y sus turnos |
+| POST | `/queues/:id/turnos` | Crea un turno (bot de WhatsApp u operador) |
+| POST | `/queues/:id/call-next` | Llama al siguiente en espera |
+| POST | `/queues/:id/finish` | Termina el turno actual (`{ advance }`) |
+| PATCH | `/queues/:id/turnos/:numero` | Mueve un turno de estado |
+| DELETE | `/queues/:id/turnos/:numero` | No-show: elimina un turno |
+
 ## Desarrollo Local
+
+Para correr todo el stack en local (frontend + backend + base de datos) sin desplegar en AWS, consulta la guia detallada en **[`docs/correr-local.md`](docs/correr-local.md)** (incluye levantar DynamoDB Local, crear la tabla y los comandos exactos).
+
+Resumen rapido:
 
 ```bash
 # Instalar dependencias
 npm install
-cd packages/apps/web/modules/app && npm install
 
-# Correr frontend y backend en paralelo
-npm run dev
+# Base de datos local (DynamoDB Local en Docker) + crear tabla TurnosTable
+# (ver docs/correr-local.md para el comando de create-table)
+docker run --rm -d --name necto-dynamo -p 8000:8000 amazon/dynamodb-local
+
+# Backend (Express, puerto 8080) — con TABLE_NAME y endpoint local
+TABLE_NAME=TurnosTable AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 \
+AWS_ACCESS_KEY_ID=fake AWS_SECRET_ACCESS_KEY=fake AWS_REGION=us-east-1 PORT=8080 \
+bun packages/services/api/modules/service/src/main.ts
+
+# Frontend (Vite, puerto 6020)
+npm run dev --prefix packages/apps/web/modules/app
 ```
 
 Esto levanta:
 - Backend (Express) en `http://localhost:8080`
-- Frontend (Vite) en `http://localhost:5173`
+- Frontend (Vite) en `http://localhost:6020` (proxy `/api` -> backend)
+
+El frontend funciona aunque el backend no este disponible: cae a datos de ejemplo en memoria (no persiste).
 
 ## Requisitos
 
 - Node.js >= 22
 - Bun (para el microservicio)
-- AWS credentials (para deploy)
+- Docker (para DynamoDB Local)
+- AWS credentials (solo para deploy)
 
 ## Arquitectura
 

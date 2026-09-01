@@ -4,7 +4,12 @@ import { PageMeta } from "@/shell/meta";
 import { MetricCard } from "@/compositions/metric-card";
 import { ButtonsGroup } from "@/elements/ui/buttons-group";
 import { Select } from "@/elements/form/select";
-import { queuesStore, type Survey } from "@/stores";
+import { Modal } from "@/elements/ui/modal";
+import { Button } from "@/elements/ui/button";
+import { Input } from "@/elements/form/input";
+import { Label } from "@/elements/form/label";
+import { Notification } from "@/elements/ui/notification";
+import { queuesStore, type Survey, type SurveyConfig } from "@/stores";
 import { GroupIcon, ShootingStarIcon, CheckCircleIcon, TimeIcon } from "@/icons";
 import { StarRating } from "./components/StarRating";
 import { CommentCard } from "./components/CommentCard";
@@ -22,6 +27,25 @@ export const EncuestasPage = observer(() => {
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
   const [queueFilter, setQueueFilter] = useState("all");
   const commentsRef = useRef<HTMLDivElement>(null);
+
+  // Toast de confirmación (top-center)
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  // Config de la vista pública de encuesta
+  const [configOpen, setConfigOpen] = useState(false);
+  const [cfgForm, setCfgForm] = useState<SurveyConfig>(queuesStore.surveyConfig);
+
+  const openConfig = () => { setCfgForm({ ...queuesStore.surveyConfig }); setConfigOpen(true); };
+  const saveConfig = () => {
+    queuesStore.updateSurveyConfig(cfgForm);
+    setConfigOpen(false);
+    showToast("Encuesta configurada correctamente");
+  };
+  const cfgField = (k: keyof SurveyConfig, v: string) => setCfgForm((f) => ({ ...f, [k]: v }));
 
   const avg = queuesStore.avgRating;
   const total = queuesStore.totalResponses;
@@ -65,10 +89,25 @@ export const EncuestasPage = observer(() => {
     <>
       <PageMeta title="Encuestas" description="Satisfaccion de tus clientes" />
 
+      {/* Toast (top-center) */}
+      {toast && (
+        <div className="fixed left-1/2 top-6 z-99999 -translate-x-1/2">
+          <Notification variant="success" title={toast} />
+        </div>
+      )}
+
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Encuestas</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Encuestas</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={openConfig}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mr-1.5 h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+          </svg>
+          Configurar encuesta
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -172,6 +211,47 @@ export const EncuestasPage = observer(() => {
           </div>
         )}
       </div>
+
+      {/* Configurar la vista pública de encuesta */}
+      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[520px] p-6">
+        <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Configurar encuesta</h4>
+        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+          Personaliza la pantalla que ve el cliente al abrir el link de calificación.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="cfg-name">Nombre del negocio</Label>
+            <Input id="cfg-name" value={cfgForm.businessName} onChange={(e) => cfgField("businessName", e.target.value)} placeholder="Ej: Mis Carnes Parrilla" />
+          </div>
+          <div>
+            <Label htmlFor="cfg-logo">URL del logo <span className="font-normal text-gray-400">(opcional)</span></Label>
+            <Input id="cfg-logo" value={cfgForm.logoUrl} onChange={(e) => cfgField("logoUrl", e.target.value)} placeholder="https://.../logo.png" />
+            <p className="mt-1.5 text-xs text-gray-400">Si lo dejas vacío se muestra un ícono por defecto.</p>
+          </div>
+          <div>
+            <Label htmlFor="cfg-title">Título</Label>
+            <Input id="cfg-title" value={cfgForm.title} onChange={(e) => cfgField("title", e.target.value)} placeholder="¿Cómo estuvo tu experiencia?" />
+          </div>
+          <div>
+            <Label htmlFor="cfg-subtitle">Texto de apoyo</Label>
+            <Input id="cfg-subtitle" value={cfgForm.subtitle} onChange={(e) => cfgField("subtitle", e.target.value)} placeholder="Tómate un momento para calificar tu visita." />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="cfg-tytitle">Título de agradecimiento</Label>
+              <Input id="cfg-tytitle" value={cfgForm.thankYouTitle} onChange={(e) => cfgField("thankYouTitle", e.target.value)} placeholder="¡Gracias por tu opinión!" />
+            </div>
+            <div>
+              <Label htmlFor="cfg-tymsg">Mensaje de agradecimiento</Label>
+              <Input id="cfg-tymsg" value={cfgForm.thankYouMessage} onChange={(e) => cfgField("thankYouMessage", e.target.value)} placeholder="Tu respuesta nos ayuda a mejorar." />
+            </div>
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+          <Button size="sm" onClick={saveConfig}>Guardar</Button>
+        </div>
+      </Modal>
     </>
   );
 });

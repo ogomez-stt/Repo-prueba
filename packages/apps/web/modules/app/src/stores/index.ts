@@ -4,4 +4,4 @@ export type { Theme, UIPreferences } from '@/shell/stores';
 
 // Domain stores
 export { queuesStore, QueuesStore } from '@/stores/queues.store';
-export type { Queue, Ticket, TicketState, AttentionMode, Saturation, Survey, Sentiment, CustomField, FieldType } from '@/stores/queues.store';
+export type { Queue, Ticket, TicketState, AttentionMode, Saturation, Survey, Sentiment, CustomField, FieldType, SurveyConfig } from '@/stores/queues.store';

@@ -6,6 +6,7 @@ import { DashboardPage } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
 import { RecepcionPage } from "@/pages/recepcion";
+import { SurveyPage } from "@/pages/survey";
 import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
@@ -113,6 +114,7 @@ export default function App() {
           Páginas sin shell - tienen su propio layout completo
           ════════════════════════════════════════════════════════════════════ */}
       <Route path="/display" element={<DisplayScreen />} />
+      <Route path="/s/:token" element={<SurveyPage />} />
       <Route path="/login" element={<AuthPageLayout><SignInForm /></AuthPageLayout>} />
       <Route path="/register" element={<AuthPageLayout><SignUpForm /></AuthPageLayout>} />
       <Route path="/forgot-password" element={<AuthPageLayout><ResetPasswordForm /></AuthPageLayout>} />

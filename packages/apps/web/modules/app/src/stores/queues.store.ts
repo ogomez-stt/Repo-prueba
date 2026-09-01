@@ -55,6 +55,16 @@ export interface Survey {
   daysAgo: number;      // for trend ordering
 }
 
+/** Branding/copy for the public survey view (the link the client opens). */
+export interface SurveyConfig {
+  businessName: string;
+  logoUrl: string;        // optional; empty = show a default star mark
+  title: string;          // e.g. "¿Cómo estuvo tu experiencia?"
+  subtitle: string;       // supporting line under the title
+  thankYouTitle: string;  // success state heading
+  thankYouMessage: string;
+}
+
 const URGENT_THRESHOLD = 10; // minutes
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -347,6 +357,20 @@ class QueuesStore {
   // ═══════════════════════════════════════════════════════════════════════════
 
   surveys: Survey[] = seedSurveys();
+
+  /** Config for the public survey view (editable from the Encuestas dashboard). */
+  surveyConfig: SurveyConfig = {
+    businessName: "Mi Negocio",
+    logoUrl: "",
+    title: "¿Cómo estuvo tu experiencia?",
+    subtitle: "Tómate un momento para calificar tu visita.",
+    thankYouTitle: "¡Gracias por tu opinión!",
+    thankYouMessage: "Tu respuesta nos ayuda a mejorar el servicio para ti y para todos.",
+  };
+
+  updateSurveyConfig(data: Partial<SurveyConfig>): void {
+    this.surveyConfig = { ...this.surveyConfig, ...data };
+  }
 
   sentimentOf(rating: number): Sentiment {
     if (rating >= 4) return "positive";
