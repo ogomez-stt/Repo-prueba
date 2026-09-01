@@ -30,11 +30,25 @@ class Turnos {
   @Endpoint(EP.$CreateTurno)
   async create(ctx: Context) {
     const { id } = ctx.request.params;
-    const { cliente, telefono } = ctx.request.body ?? {};
+    const { cliente, telefono, datos } = ctx.request.body ?? {};
     if (!cliente || typeof cliente !== 'string') {
       return new HttpResponseBadRequest({ error: 'cliente is required' });
     }
-    const ticket = await this.dao(ctx).createTicket(id, { cliente, telefono });
+    if (!telefono || typeof telefono !== 'string' || telefono.trim().length < 7) {
+      return new HttpResponseBadRequest({ error: 'telefono es obligatorio' });
+    }
+
+    // Validate the queue's required custom fields are present.
+    const queue = await this.dao(ctx).getQueueWithTickets(id);
+    if (!queue) return new HttpResponseNotFound({ error: 'Queue not found' });
+    const datosObj: Record<string, string> = (datos && typeof datos === 'object') ? datos : {};
+    for (const field of queue.campos) {
+      if (field.required && !String(datosObj[field.id] ?? '').trim()) {
+        return new HttpResponseBadRequest({ error: `El campo "${field.label}" es obligatorio` });
+      }
+    }
+
+    const ticket = await this.dao(ctx).createTicket(id, { cliente, telefono, datos: datosObj });
     if (!ticket) return new HttpResponseNotFound({ error: 'Queue not found' });
     return new HttpResponseCreated({ ticket });
   }

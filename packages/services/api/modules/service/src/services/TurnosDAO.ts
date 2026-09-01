@@ -15,6 +15,16 @@ import { randomUUID } from 'node:crypto';
 
 export type TicketState = 'waiting' | 'serving' | 'done';
 export type AttentionMode = 'auto' | 'manual';
+export type FieldType = 'text' | 'textarea' | 'number' | 'select';
+
+/** A custom field the operator/bot must fill when creating a ticket in this queue. */
+export interface CustomField {
+  id: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  options?: string[]; // only for type 'select'
+}
 
 export interface Queue {
   id: string;
@@ -24,6 +34,7 @@ export interface Queue {
   mode: AttentionMode;
   tiempoProm: number;
   activa: boolean;
+  campos: CustomField[]; // per-queue custom fields for ticket creation
 }
 
 export interface Ticket {
@@ -34,6 +45,7 @@ export interface Ticket {
   createdAt: string;
   calledAt?: string;
   finishedAt?: string;
+  datos?: Record<string, string>; // values for the queue's custom fields
 }
 
 /** A queue with its tickets grouped by state (shape the frontend consumes). */
@@ -72,6 +84,7 @@ interface QueueItem {
   tiempoProm: number;
   activa: boolean;
   seq: number; // monotonic counter for ticket numbering
+  campos?: CustomField[];
 }
 
 interface TicketItem {
@@ -85,6 +98,7 @@ interface TicketItem {
   createdAt: string;
   calledAt?: string;
   finishedAt?: string;
+  datos?: Record<string, string>;
   gsi1pk: string; // QUEUE#{id}
   gsi1sk: string; // STATE#{estado}#{createdAt}
 }
@@ -124,6 +138,7 @@ export class TurnosDAO {
       mode: item.mode,
       tiempoProm: item.tiempoProm,
       activa: item.activa,
+      campos: item.campos ?? [],
     };
   }
 
@@ -136,6 +151,7 @@ export class TurnosDAO {
       createdAt: item.createdAt,
       calledAt: item.calledAt,
       finishedAt: item.finishedAt,
+      datos: item.datos,
     };
   }
 
@@ -200,6 +216,7 @@ export class TurnosDAO {
     mode: AttentionMode;
     tiempoProm: number;
     color?: string;
+    campos?: CustomField[];
   }): Promise<Queue> {
     const id = randomUUID();
     const existing = await this.listQueues();
@@ -217,6 +234,7 @@ export class TurnosDAO {
       tiempoProm: data.tiempoProm,
       activa: true,
       seq: 0,
+      campos: data.campos ?? [],
     };
 
     await this.doc.send(new PutCommand({ TableName: this.table, Item: item }));
@@ -242,6 +260,7 @@ export class TurnosDAO {
     mode?: AttentionMode;
     tiempoProm?: number;
     activa?: boolean;
+    campos?: CustomField[];
   }): Promise<Queue | null> {
     const sets: string[] = [];
     const names: Record<string, string> = {};
@@ -289,8 +308,11 @@ export class TurnosDAO {
   // TICKETS (turnos)
   // ═══════════════════════════════════════════════════════════════════════
 
-  /** Create a ticket in `waiting` — called by the WhatsApp bot. */
-  async createTicket(queueId: string, data: { cliente: string; telefono?: string }): Promise<Ticket | null> {
+  /** Create a ticket in `waiting` — called by the WhatsApp bot OR the operator view. */
+  async createTicket(
+    queueId: string,
+    data: { cliente: string; telefono?: string; datos?: Record<string, string> },
+  ): Promise<Ticket | null> {
     const meta = await this.getQueueMeta(queueId);
     if (!meta) return null;
 
@@ -316,6 +338,7 @@ export class TurnosDAO {
       telefono: data.telefono,
       estado: 'waiting',
       createdAt,
+      datos: data.datos,
       gsi1pk: queuePk(queueId),
       gsi1sk: `STATE#waiting#${createdAt}`,
     };

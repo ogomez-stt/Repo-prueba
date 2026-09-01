@@ -8,12 +8,24 @@ import { queuesApi } from "@/services/queues.api";
 export type TicketState = "waiting" | "serving" | "done";
 export type AttentionMode = "auto" | "manual";
 export type Saturation = "ok" | "busy" | "full";
+export type FieldType = "text" | "textarea" | "number" | "select";
+
+/** A custom field the operator/bot must fill when creating a ticket in this queue. */
+export interface CustomField {
+  id: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  options?: string[]; // only for type 'select'
+}
 
 export interface Ticket {
   numero: string;
   cliente: string;
   espera: string;   // display, e.g. "12 min"
   waitedMin: number; // numeric minutes for urgency calc
+  telefono?: string;
+  datos?: Record<string, string>; // values for the queue's custom fields
 }
 
 export interface Queue {
@@ -24,6 +36,7 @@ export interface Queue {
   mode: AttentionMode;
   tiempoProm: number;         // minutes
   activa: boolean;
+  campos: CustomField[];      // per-queue custom fields for ticket creation
   waiting: Ticket[];
   serving: Ticket[];
   done: Ticket[];
@@ -51,6 +64,10 @@ const URGENT_THRESHOLD = 10; // minutes
 const seed = (): Queue[] => [
   {
     id: "1", nombre: "Consulta general", color: "bg-brand-500", servicio: "general", mode: "auto", tiempoProm: 14, activa: true,
+    campos: [
+      { id: "motivo", label: "Motivo de consulta", type: "textarea", required: true },
+      { id: "documento", label: "Documento", type: "text", required: false },
+    ],
     waiting: [
       { numero: "A-043", cliente: "Ana Silva", espera: "15 min", waitedMin: 15 },
       { numero: "A-044", cliente: "Pedro Ramirez", espera: "6 min", waitedMin: 6 },
@@ -61,6 +78,7 @@ const seed = (): Queue[] => [
   },
   {
     id: "2", nombre: "Laboratorio", color: "bg-secondary-500", servicio: "general", mode: "manual", tiempoProm: 25, activa: true,
+    campos: [],
     waiting: [
       { numero: "L-018", cliente: "Carlos Mendoza", espera: "22 min", waitedMin: 22 },
       { numero: "L-019", cliente: "Lucia Torres", espera: "12 min", waitedMin: 12 },
@@ -69,10 +87,17 @@ const seed = (): Queue[] => [
     done: [],
   },
   {
-    id: "3", nombre: "Farmacia", color: "bg-accent-500", servicio: "general", mode: "auto", tiempoProm: 6, activa: false,
-    waiting: [],
+    id: "3", nombre: "Mesa / Pedidos", color: "bg-accent-500", servicio: "restaurante", mode: "manual", tiempoProm: 20, activa: true,
+    campos: [
+      { id: "pedido", label: "Pedido", type: "textarea", required: true },
+      { id: "personas", label: "N° de personas", type: "number", required: false },
+      { id: "modalidad", label: "Modalidad", type: "select", required: true, options: ["En mesa", "Para llevar", "Domicilio"] },
+    ],
+    waiting: [
+      { numero: "M-012", cliente: "Juan Carlos", espera: "8 min", waitedMin: 8, datos: { pedido: "2 bandeja paisa", modalidad: "En mesa" } },
+    ],
     serving: [],
-    done: [{ numero: "F-030", cliente: "Juan Perez", espera: "", waitedMin: 0 }],
+    done: [{ numero: "M-011", cliente: "Laura Peña", espera: "", waitedMin: 0, datos: { pedido: "1 mojarra frita", modalidad: "Para llevar" } }],
   },
 ];
 
@@ -192,7 +217,7 @@ class QueuesStore {
   }
 
   // ── Queue CRUD ──
-  createQueue(data: { nombre: string; servicio: string; mode: AttentionMode; tiempoProm: number }): void {
+  createQueue(data: { nombre: string; servicio: string; mode: AttentionMode; tiempoProm: number; campos?: CustomField[] }): void {
     const color = COLOR_OPTIONS[this.queues.length % COLOR_OPTIONS.length];
     this.queues.push({
       id: crypto.randomUUID(),
@@ -202,6 +227,7 @@ class QueuesStore {
       mode: data.mode,
       tiempoProm: data.tiempoProm,
       activa: true,
+      campos: data.campos ?? [],
       waiting: [],
       serving: [],
       done: [],
@@ -210,13 +236,14 @@ class QueuesStore {
     this.sync(null, queuesApi.create(data));
   }
 
-  updateQueue(id: string, data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number }): void {
+  updateQueue(id: string, data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number; campos?: CustomField[] }): void {
     const q = this.getQueue(id);
     if (!q) return;
     if (data.nombre !== undefined) q.nombre = data.nombre;
     if (data.servicio !== undefined) q.servicio = data.servicio;
     if (data.mode !== undefined) q.mode = data.mode;
     if (data.tiempoProm !== undefined) q.tiempoProm = data.tiempoProm;
+    if (data.campos !== undefined) q.campos = data.campos;
     this.sync(id, queuesApi.update(id, data));
   }
 
@@ -276,6 +303,25 @@ class QueuesStore {
       q.serving.push({ ...next, espera: "0 min", waitedMin: 0 });
     }
     this.sync(queueId, queuesApi.finish(queueId, true));
+  }
+
+  /** Create a new ticket in a queue (operator view). The bot uses the same API. */
+  createTicket(queueId: string, data: { cliente: string; telefono: string; datos?: Record<string, string> }): void {
+    const q = this.getQueue(queueId);
+    if (!q) return;
+    // Optimistic local insert with a provisional number; refreshed from API.
+    const provisional = `${q.nombre.charAt(0).toUpperCase()}-${String(
+      q.waiting.length + q.serving.length + q.done.length + 1,
+    ).padStart(3, "0")}`;
+    q.waiting.push({
+      numero: provisional,
+      cliente: data.cliente,
+      espera: "0 min",
+      waitedMin: 0,
+      telefono: data.telefono,
+      datos: data.datos,
+    });
+    this.sync(queueId, queuesApi.createTicket(queueId, data));
   }
 
   /** Start serving the first waiting ticket if none is being served. */

@@ -1,4 +1,4 @@
-import type { Queue, Ticket, AttentionMode, TicketState } from "@/stores/queues.store";
+import type { Queue, Ticket, AttentionMode, TicketState, CustomField } from "@/stores/queues.store";
 
 /**
  * queues.api — Fetch layer between the frontend store and the NECTO backend
@@ -19,6 +19,7 @@ interface BackendTicket {
   createdAt: string;
   calledAt?: string;
   finishedAt?: string;
+  datos?: Record<string, string>;
 }
 
 interface BackendQueue {
@@ -29,6 +30,7 @@ interface BackendQueue {
   mode: AttentionMode;
   tiempoProm: number;
   activa: boolean;
+  campos?: CustomField[];
   waiting: BackendTicket[];
   serving: BackendTicket[];
   done: BackendTicket[];
@@ -48,6 +50,8 @@ function mapTicket(t: BackendTicket): Ticket {
     cliente: t.cliente,
     espera: `${waitedMin} min`,
     waitedMin,
+    telefono: t.telefono,
+    datos: t.datos,
   };
 }
 
@@ -60,6 +64,7 @@ function mapQueue(q: BackendQueue): Queue {
     mode: q.mode,
     tiempoProm: q.tiempoProm,
     activa: q.activa,
+    campos: q.campos ?? [],
     waiting: (q.waiting ?? []).map(mapTicket),
     serving: (q.serving ?? []).map(mapTicket),
     done: (q.done ?? []).map(mapTicket),
@@ -106,6 +111,7 @@ export const queuesApi = {
     servicio: string;
     mode: AttentionMode;
     tiempoProm: number;
+    campos?: CustomField[];
   }): Promise<Queue> {
     const { queue } = await http<{ queue: BackendQueue }>("/queues", {
       method: "POST",
@@ -116,7 +122,7 @@ export const queuesApi = {
 
   async update(
     id: string,
-    data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number; activa?: boolean },
+    data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number; activa?: boolean; campos?: CustomField[] },
   ): Promise<void> {
     await http(`/queues/${id}`, { method: "PATCH", body: JSON.stringify(data) });
   },
@@ -126,7 +132,10 @@ export const queuesApi = {
   },
 
   // ── Tickets (turnos) ──
-  async createTicket(queueId: string, data: { cliente: string; telefono?: string }): Promise<void> {
+  async createTicket(
+    queueId: string,
+    data: { cliente: string; telefono?: string; datos?: Record<string, string> },
+  ): Promise<void> {
     await http(`/queues/${queueId}/turnos`, { method: "POST", body: JSON.stringify(data) });
   },
 

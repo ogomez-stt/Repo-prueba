@@ -6,7 +6,7 @@ import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { Select } from "@/elements/form/select";
 import { Notification } from "@/elements/ui/notification";
-import { queuesStore, type Queue, type AttentionMode } from "@/stores";
+import { queuesStore, type Queue, type AttentionMode, type CustomField, type FieldType } from "@/stores";
 import { QueueCard } from "./components/QueueCard";
 
 interface QueueForm {
@@ -14,9 +14,21 @@ interface QueueForm {
   servicio: string;
   modo: AttentionMode;
   tiempo: string;
+  campos: CustomField[];
 }
 
-const emptyForm: QueueForm = { nombre: "", servicio: "general", modo: "auto", tiempo: "10" };
+const emptyForm: QueueForm = { nombre: "", servicio: "general", modo: "auto", tiempo: "10", campos: [] };
+
+const fieldTypeLabels: { value: FieldType; label: string }[] = [
+  { value: "text", label: "Texto corto" },
+  { value: "textarea", label: "Texto largo" },
+  { value: "number", label: "Número" },
+  { value: "select", label: "Selección" },
+];
+
+const slugify = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ||
+  `campo-${Date.now()}`;
 
 export const ColasPage = observer(() => {
   const navigate = useNavigate();
@@ -42,18 +54,47 @@ export const ColasPage = observer(() => {
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (q: Queue) => {
     setEditingId(q.id);
-    setForm({ nombre: q.nombre, servicio: q.servicio, modo: q.mode, tiempo: String(q.tiempoProm) });
+    setForm({ nombre: q.nombre, servicio: q.servicio, modo: q.mode, tiempo: String(q.tiempoProm), campos: q.campos.map((c) => ({ ...c })) });
     setModalOpen(true);
+  };
+
+  // ── Custom fields editor ──
+  const addField = () => {
+    setForm((f) => ({
+      ...f,
+      campos: [...f.campos, { id: `campo-${Date.now()}`, label: "", type: "text", required: false }],
+    }));
+  };
+  const updateField = (idx: number, patch: Partial<CustomField>) => {
+    setForm((f) => ({
+      ...f,
+      campos: f.campos.map((c, i) => (i === idx ? { ...c, ...patch } : c)),
+    }));
+  };
+  const removeField = (idx: number) => {
+    setForm((f) => ({ ...f, campos: f.campos.filter((_, i) => i !== idx) }));
   };
 
   const saveQueue = () => {
     if (!form.nombre.trim()) return;
+    // Normalize fields: derive stable ids from labels, drop empty labels, clean select options.
+    const campos: CustomField[] = form.campos
+      .filter((c) => c.label.trim())
+      .map((c) => ({
+        id: slugify(c.label),
+        label: c.label.trim(),
+        type: c.type,
+        required: c.required,
+        options: c.type === "select" ? (c.options ?? []).map((o) => o.trim()).filter(Boolean) : undefined,
+      }));
+
     if (editingId) {
       queuesStore.updateQueue(editingId, {
         nombre: form.nombre,
         servicio: form.servicio,
         mode: form.modo,
         tiempoProm: Number(form.tiempo) || 10,
+        campos,
       });
       showToast("Cola actualizada");
     } else {
@@ -62,6 +103,7 @@ export const ColasPage = observer(() => {
         servicio: form.servicio,
         mode: form.modo,
         tiempoProm: Number(form.tiempo) || 10,
+        campos,
       });
       showToast("Cola creada");
     }
@@ -190,6 +232,82 @@ export const ColasPage = observer(() => {
               onChange={(e) => setForm({ ...form, tiempo: e.target.value })}
               className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-700 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:text-gray-200"
             />
+          </div>
+
+          {/* Custom fields editor */}
+          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Campos para crear un turno</label>
+              <button
+                type="button"
+                onClick={addField}
+                className="rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-300"
+              >
+                + Agregar campo
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-gray-400">
+              Datos que el operador (o el bot) debe llenar al crear un turno en esta cola. Ej: Pedido, Motivo, Documento.
+            </p>
+
+            {form.campos.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-gray-200 py-4 text-center text-xs text-gray-400 dark:border-gray-700">
+                Sin campos extra. Solo se pedirá nombre y teléfono.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {form.campos.map((c, idx) => (
+                  <div key={idx} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                    <div className="flex items-start gap-2">
+                      <input
+                        value={c.label}
+                        onChange={(e) => updateField(idx, { label: e.target.value })}
+                        placeholder="Nombre del campo (ej: Pedido)"
+                        className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                      />
+                      <select
+                        value={c.type}
+                        onChange={(e) => updateField(idx, { type: e.target.value as FieldType })}
+                        className="rounded-lg border border-gray-300 bg-transparent px-2 py-2 text-sm text-gray-700 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                      >
+                        {fieldTypeLabels.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeField(idx)}
+                        aria-label="Quitar campo"
+                        className="rounded-lg p-2 text-gray-400 hover:bg-error-50 hover:text-error-500 dark:hover:bg-error-500/15"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {c.type === "select" && (
+                      <input
+                        value={(c.options ?? []).join(", ")}
+                        onChange={(e) => updateField(idx, { options: e.target.value.split(",").map((o) => o.trimStart()) })}
+                        placeholder="Opciones separadas por coma (ej: En mesa, Para llevar)"
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-xs text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                      />
+                    )}
+
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={c.required}
+                        onChange={(e) => updateField(idx, { required: e.target.checked })}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-brand-500 focus:ring-brand-500/20"
+                      />
+                      Obligatorio
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">

@@ -5,6 +5,7 @@ import { AppShell } from "@/app/AppShell";
 import { DashboardPage } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
+import { RecepcionPage } from "@/pages/recepcion";
 import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
@@ -97,6 +98,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/turnos" element={<TurnosPage />} />
+        <Route path="/recepcion" element={<RecepcionPage />} />
         <Route path="/colas" element={<ColasPage />} />
         <Route path="/encuestas" element={<EncuestasPage />} />
         <Route path="/agendamiento" element={<PlaceholderPage title="Agenda" description="Vista principal de agendamientos." />} />

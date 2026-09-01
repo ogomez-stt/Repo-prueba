@@ -117,6 +117,7 @@ const SidebarContent = () => {
           <ul className="flex flex-col gap-1">
             <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
             <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
+            <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />
             <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
             <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
           </ul>

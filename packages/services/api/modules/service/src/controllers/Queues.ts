@@ -34,7 +34,7 @@ class Queues {
 
   @Endpoint(EP.$CreateQueue)
   async create(ctx: Context) {
-    const { nombre, servicio, mode, tiempoProm, color } = ctx.request.body ?? {};
+    const { nombre, servicio, mode, tiempoProm, color, campos } = ctx.request.body ?? {};
     if (!nombre || typeof nombre !== 'string') {
       return new HttpResponseBadRequest({ error: 'nombre is required' });
     }
@@ -47,6 +47,7 @@ class Queues {
       mode: mode ?? 'auto',
       tiempoProm: Number(tiempoProm) || 10,
       color,
+      campos: Array.isArray(campos) ? campos : undefined,
     });
     return new HttpResponseCreated({ queue });
   }
@@ -62,7 +63,7 @@ class Queues {
   @Endpoint(EP.$UpdateQueue)
   async update(ctx: Context) {
     const { id } = ctx.request.params;
-    const { nombre, servicio, mode, tiempoProm, activa } = ctx.request.body ?? {};
+    const { nombre, servicio, mode, tiempoProm, activa, campos } = ctx.request.body ?? {};
     if (mode && !VALID_MODES.includes(mode)) {
       return new HttpResponseBadRequest({ error: 'mode must be auto | manual' });
     }
@@ -72,6 +73,7 @@ class Queues {
       mode,
       tiempoProm: tiempoProm !== undefined ? Number(tiempoProm) : undefined,
       activa,
+      campos: Array.isArray(campos) ? campos : undefined,
     });
     if (!queue) return new HttpResponseNotFound({ error: 'Queue not found' });
     return new HttpResponseOK({ queue });
