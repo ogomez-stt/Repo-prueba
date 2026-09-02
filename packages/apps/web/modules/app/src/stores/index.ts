@@ -5,3 +5,6 @@ export type { Theme, UIPreferences } from '@/shell/stores';
 // Domain stores
 export { queuesStore, QueuesStore } from '@/stores/queues.store';
 export type { Queue, Ticket, TicketState, AttentionMode, Saturation, Survey, Sentiment, CustomField, FieldType, SurveyConfig } from '@/stores/queues.store';
+
+export { agendaStore, AgendaStore, todayIso } from '@/stores/agenda.store';
+export type { Profesional, Cita, Cliente, CitaEstado, Modalidad, CalendarConfig } from '@/stores/agenda.store';

@@ -16,7 +16,7 @@ import {
   ArrowRightIcon,
   CalenderIcon,
   PlusIcon,
-  DocsIcon,
+  PieChartIcon,
 } from "@/icons";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -127,9 +127,10 @@ const SidebarContent = () => {
         <div>
           <MenuSectionHeader title="Agendamiento" />
           <ul className="flex flex-col gap-1">
-            <MenuItem icon={<CalenderIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
-            <MenuItem icon={<DocsIcon />} name="Detalles" path="/agendamiento/detalles" isActive={isActive} />
-            <MenuItem icon={<PlusIcon />} name="Crear agendamiento" path="/agendamiento/crear" isActive={isActive} />
+            <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
+            <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />
+            <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />
+            <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />
           </ul>
         </div>
       </div>

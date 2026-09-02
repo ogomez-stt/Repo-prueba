@@ -9,6 +9,7 @@ import { RecepcionPage } from "@/pages/recepcion";
 import { SurveyPage } from "@/pages/survey";
 import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
+import { AgendaPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
@@ -102,9 +103,11 @@ export default function App() {
         <Route path="/recepcion" element={<RecepcionPage />} />
         <Route path="/colas" element={<ColasPage />} />
         <Route path="/encuestas" element={<EncuestasPage />} />
-        <Route path="/agendamiento" element={<PlaceholderPage title="Agenda" description="Vista principal de agendamientos." />} />
-        <Route path="/agendamiento/detalles" element={<PlaceholderPage title="Detalles de agendamiento" description="Detalle de un agendamiento." />} />
-        <Route path="/agendamiento/crear" element={<PlaceholderPage title="Crear agendamiento" description="Crea un nuevo agendamiento." />} />
+        <Route path="/agendamiento" element={<AgendaPage />} />
+        <Route path="/agendamiento/calendario" element={<CalendarioPage />} />
+        <Route path="/agendamiento/detalles" element={<CitaDetallePage />} />
+        <Route path="/agendamiento/crear" element={<CrearCitaPage />} />
+        <Route path="/agendamiento/analitica" element={<AnaliticaPage />} />
         <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
         <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>
