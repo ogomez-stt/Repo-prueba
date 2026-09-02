@@ -43,6 +43,23 @@ export interface Cliente {
   noShows: number;
 }
 
+/** Loyalty tier for a client, derived from their appointment regularity. */
+export type Tier = "oro" | "plata" | "bronce" | "riesgo";
+
+/** A client enriched with loyalty/regularity insights (analytics view). */
+export interface ClienteFidelidad {
+  cliente: Cliente;
+  tier: Tier;
+  /** Attendance rate: completadas / (completadas + noShows), 0–100. */
+  cumplimiento: number;
+  /** Days since the client's first appointment. */
+  antiguedadDias: number;
+  /** Suggested reward the operator can offer now, or null. */
+  recompensa: string | null;
+  /** Why the client is at risk, when tier === "riesgo". */
+  motivoRiesgo: string | null;
+}
+
 /** Calendar availability config: which weekdays and what hours the business works. */
 export interface CalendarConfig {
   /** Working weekdays: 0=Sunday … 6=Saturday. */
@@ -289,6 +306,120 @@ class AgendaStore {
       .map(([servicio, count]) => ({ servicio, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LOYALTY / FIDELIDAD  (regularity-based tiers & rewards)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  private static readonly INACTIVO_DIAS = 45; // sin volver → en riesgo
+
+  /** Days since the client last had (or has) a cita, using citas history. */
+  private diasDesdeUltimaCita(clienteId: string): number {
+    const fechas = this.citas
+      .filter((c) => c.clienteId === clienteId && c.estado !== "cancelada")
+      .map((c) => c.fecha)
+      .sort();
+    if (fechas.length === 0) return Infinity;
+    const ultima = new Date(fechas[fechas.length - 1] + "T00:00:00");
+    return Math.floor((Date.now() - ultima.getTime()) / 86400000);
+  }
+
+  /** Attendance rate 0–100 (completadas over attended = completadas + noShows). */
+  cumplimientoDe(c: Cliente): number {
+    const base = c.completadas + c.noShows;
+    if (base === 0) return 100;
+    return Math.round((c.completadas / base) * 100);
+  }
+
+  /**
+   * Loyalty tier from regularity:
+   * - riesgo: 2+ no-shows, o inactivo > 45 días teniendo historial
+   * - oro:    6+ citas completadas
+   * - plata:  3–5 completadas
+   * - bronce: 1–2 (recién llega)
+   */
+  tierDeCliente(c: Cliente): Tier {
+    const dias = this.diasDesdeUltimaCita(c.id);
+    if (c.noShows >= 2) return "riesgo";
+    if (c.totalCitas > 1 && dias > AgendaStore.INACTIVO_DIAS && dias !== Infinity) return "riesgo";
+    if (c.completadas >= 6) return "oro";
+    if (c.completadas >= 3) return "plata";
+    return "bronce";
+  }
+
+  private recompensaDe(c: Cliente, tier: Tier): string | null {
+    if (tier === "oro") return "Sesión de cortesía o 20% de descuento";
+    if (tier === "plata") return "10% de descuento en su próxima cita";
+    if (tier === "bronce" && c.completadas >= 2) return "Bienvenida: 5% en la siguiente";
+    return null;
+  }
+
+  private motivoRiesgoDe(c: Cliente): string | null {
+    if (c.noShows >= 2) return `${c.noShows} inasistencias`;
+    const dias = this.diasDesdeUltimaCita(c.id);
+    if (c.totalCitas > 1 && dias > AgendaStore.INACTIVO_DIAS && dias !== Infinity) {
+      return `Sin volver hace ${dias} días`;
+    }
+    return null;
+  }
+
+  /** Full loyalty profile for every client. */
+  get fidelidad(): ClienteFidelidad[] {
+    return this.clientes.map((cliente) => {
+      const tier = this.tierDeCliente(cliente);
+      const antiguedadDias = Math.floor((Date.now() - new Date(cliente.desde + "T00:00:00").getTime()) / 86400000);
+      return {
+        cliente,
+        tier,
+        cumplimiento: this.cumplimientoDe(cliente),
+        antiguedadDias,
+        recompensa: this.recompensaDe(cliente, tier),
+        motivoRiesgo: this.motivoRiesgoDe(cliente),
+      };
+    });
+  }
+
+  /** Count of clients per tier (for the loyalty program summary). */
+  get conteoPorTier(): Record<Tier, number> {
+    const base: Record<Tier, number> = { oro: 0, plata: 0, bronce: 0, riesgo: 0 };
+    for (const f of this.fidelidad) base[f.tier]++;
+    return base;
+  }
+
+  /** Clients that qualify for a reward right now (not at risk), best first. */
+  get clientesConRecompensa(): ClienteFidelidad[] {
+    return this.fidelidad
+      .filter((f) => f.recompensa && f.tier !== "riesgo")
+      .sort((a, b) => b.cliente.completadas - a.cliente.completadas);
+  }
+
+  /** Clients flagged at risk (no-shows or inactive), to re-engage. */
+  get clientesEnRiesgo(): ClienteFidelidad[] {
+    return this.fidelidad.filter((f) => f.tier === "riesgo");
+  }
+
+  /** Average days between visits across recurring clients (regularity signal). */
+  get frecuenciaPromedioDias(): number {
+    const recurrentes = this.clientes.filter((c) => c.totalCitas > 1);
+    if (recurrentes.length === 0) return 0;
+    const total = recurrentes.reduce((s, c) => {
+      const antiguedad = Math.floor((Date.now() - new Date(c.desde + "T00:00:00").getTime()) / 86400000);
+      return s + antiguedad / c.totalCitas;
+    }, 0);
+    return Math.round(total / recurrentes.length);
+  }
+
+  // ── Tier display helpers ──
+  tierLabel(t: Tier): string {
+    return { oro: "Oro", plata: "Plata", bronce: "Bronce", riesgo: "En riesgo" }[t];
+  }
+  tierBadgeColor(t: Tier): "warning" | "light" | "info" | "error" {
+    // oro→warning(dorado), plata→light(gris), bronce→info, riesgo→error
+    return ({ oro: "warning", plata: "light", bronce: "info", riesgo: "error" } as const)[t];
+  }
+  tierDotClass(t: Tier): string {
+    return ({ oro: "bg-warning-400", plata: "bg-gray-400", bronce: "bg-blue-light-400", riesgo: "bg-error-500" } as const)[t];
   }
 
   // ═══════════════════════════════════════════════════════════════════════
