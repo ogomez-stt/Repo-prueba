@@ -6,11 +6,17 @@ Sistema de gestion de turnos para negocios pequeños (hospitales, restaurantes, 
 
 Actores del sistema:
 
-- **Dueño / operador** — Administra colas de atencion y turnos desde el panel: crear/editar/pausar colas, llamar y completar turnos (modo automatico o manual), reordenar por drag-and-drop, marcar no-show, y ver estadisticas y encuestas.
-- **Bot de WhatsApp** — Crea turnos automaticamente cuando un cliente los solicita (mismo endpoint que la vista de operador).
+- **Dueño / operador** — Administra colas y turnos, y las citas de sus profesionales, desde el panel: crear/editar/pausar colas, llamar y completar turnos, agendar/reagendar/confirmar citas, ver estadisticas, encuestas y analitica de fidelidad.
+- **Profesional** — La persona que atiende las citas de agendamiento (psicologa, nutricionista, etc.), presencial o virtual.
+- **Bot de WhatsApp** — Crea turnos y citas automaticamente cuando un cliente los solicita (mismo endpoint que la vista de operador).
 - **Cliente final** — Recibe avisos por WhatsApp y, al terminar el servicio, abre un link publico para calificar su experiencia.
 
-## Vistas principales
+## Módulos
+
+NECTO tiene dos módulos: **Turnos** (fila de atención en vivo del día) y
+**Agendamiento** (citas programadas a futuro con profesionales, presencial o virtual).
+
+### Turnos
 
 | Ruta | Vista | Descripcion |
 |------|-------|-------------|
@@ -21,6 +27,16 @@ Actores del sistema:
 | `/encuestas` | Encuestas | Dashboard de satisfaccion + configuracion de la vista publica de encuesta |
 | `/display` | Pantalla de sala | Pantalla fullscreen para TV (`?cola=<id>&sound=1`) |
 | `/s/:token` | Encuesta (publica) | Vista que abre el cliente desde el link de WhatsApp para calificar |
+
+### Agendamiento (citas con profesionales)
+
+| Ruta | Vista | Descripcion |
+|------|-------|-------------|
+| `/agendamiento` | Agenda | Lista de citas agrupada por dia, filtros por profesional/estado, acciones rapidas |
+| `/agendamiento/calendario` | Calendario | Vista mensual clickeable + panel del dia + configuracion de horarios laborales |
+| `/agendamiento/crear` | Agendar cita | Formulario del operador (con DatePicker), presencial/virtual, telefono obligatorio |
+| `/agendamiento/detalles` | Detalle de cita | Datos + acciones admin (confirmar/reagendar/cancelar/completar/WhatsApp) |
+| `/agendamiento/analitica` | Analitica | Regularidad de clientes + sistema de fidelidad/recompensas (Oro/Plata/Bronce/En riesgo) |
 
 ### Campos personalizados por cola
 
@@ -54,10 +70,16 @@ packages/
 └── apps/web/             Frontend
     └── modules/app/
         └── src/
-            ├── pages/         dashboard, turnos, recepcion, colas, encuestas, display, survey
-            ├── stores/        queues.store.ts (MobX, fuente de verdad)
-            └── services/      queues.api.ts (cliente fetch al backend)
+            ├── pages/         dashboard, turnos, recepcion, colas, encuestas,
+            │                  display, survey, agendamiento
+            ├── stores/        queues.store.ts (turnos, conectado al API)
+            │                  agenda.store.ts (agendamiento, MOCK)
+            └── services/      queues.api.ts (cliente fetch al backend de turnos)
 ```
+
+**Estado del backend:** el módulo de **Turnos** tiene backend real (endpoints abajo)
+y el frontend está conectado. El módulo de **Agendamiento** y las **encuestas
+persistidas** son por ahora solo frontend con datos mock (ver `docs/frontend-handoff-backend.md`).
 
 ### API (backend)
 
