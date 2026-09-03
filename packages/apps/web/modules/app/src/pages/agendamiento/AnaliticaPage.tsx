@@ -1,16 +1,20 @@
 import type { ApexOptions } from "apexcharts";
+import { useState } from "react";
 import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Card, CardTitle } from "@/elements/ui/card";
 import { Badge } from "@/elements/ui/badge";
 import { Button } from "@/elements/ui/button";
 import { Alert } from "@/elements/ui/alert";
+import { Modal } from "@/elements/ui/modal";
+import { Input } from "@/elements/form/input";
+import { Label } from "@/elements/form/label";
 import { LineChart } from "@/elements/ui/line-chart";
 import { PieChart } from "@/elements/ui/pie-chart";
 import { MetricCard } from "@/compositions/metric-card";
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/elements/ui/table";
 import { GroupIcon, UserCircleIcon, TimeIcon, CalenderIcon } from "@/icons";
-import { agendaStore, type ClienteFidelidad, type Tier } from "@/stores";
+import { agendaStore, type ClienteFidelidad, type Tier, type LoyaltyConfig } from "@/stores";
 
 const ORANGE = "#FF3F1A";
 const INDIGO = "#190088";
@@ -45,6 +49,15 @@ export const AnaliticaPage = observer(() => {
   const recompensas = agendaStore.clientesConRecompensa;
   const enRiesgo = agendaStore.clientesEnRiesgo;
   const fidelidad = [...agendaStore.fidelidad].sort((a, b) => b.cliente.completadas - a.cliente.completadas);
+  const cfg = agendaStore.loyaltyConfig;
+
+  // ── Configuración del programa de fidelidad ──
+  const [configOpen, setConfigOpen] = useState(false);
+  const [form, setForm] = useState<LoyaltyConfig>(cfg);
+  const openConfig = () => { setForm({ ...agendaStore.loyaltyConfig }); setConfigOpen(true); };
+  const setField = <K extends keyof LoyaltyConfig>(k: K, v: LoyaltyConfig[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const guardarConfig = () => { agendaStore.updateLoyaltyConfig(form); setConfigOpen(false); };
+  const formValido = form.oroMin > form.plataMin && form.plataMin >= 1;
 
   // ── Citas por semana (área con degradado) ──
   const tendenciaOptions: ApexOptions = {
@@ -87,9 +100,14 @@ export const AnaliticaPage = observer(() => {
     <>
       <PageMeta title="Analítica" description="Datos de tus clientes, regularidad y fidelidad" />
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Analítica de clientes</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Mide la regularidad, detecta clientes fieles y decide a quién premiar o reactivar</p>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Analítica de clientes</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Mide la regularidad, detecta clientes fieles y decide a quién premiar o reactivar</p>
+        </div>
+        <Button size="sm" variant="outline" startIcon={<GiftIcon className="h-4 w-4" />} onClick={openConfig}>
+          Configurar fidelidad
+        </Button>
       </div>
 
       {/* KPIs — HorizontalMetricCard de Elements */}
@@ -121,10 +139,10 @@ export const AnaliticaPage = observer(() => {
 
         {/* Conteo por nivel */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {tierCard("oro", "6+ citas completadas")}
-          {tierCard("plata", "3–5 completadas")}
+          {tierCard("oro", `${cfg.oroMin}+ citas completadas`)}
+          {tierCard("plata", `${cfg.plataMin}–${cfg.oroMin - 1} completadas`)}
           {tierCard("bronce", "Recién llegan")}
-          {tierCard("riesgo", "Inasistencias o inactivos")}
+          {tierCard("riesgo", `${cfg.riesgoNoShows}+ inasistencias o inactivos`)}
         </div>
 
         {/* Listos para recompensa — ButtonCard pattern */}
@@ -250,6 +268,78 @@ export const AnaliticaPage = observer(() => {
           </div>
         </Card>
       </div>
+
+      {/* ── MODAL: Configurar programa de fidelidad ── */}
+      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[560px] p-6">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-brand-500"><GiftIcon /></span>
+          <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">Programa de fidelidad</h4>
+        </div>
+        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+          Ajusta a tu gusto los niveles, los criterios y los cupones/recompensas de cada nivel.
+        </p>
+
+        <div className="space-y-5">
+          {/* Umbrales */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Niveles por citas completadas</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="oroMin"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning-400" />Oro desde</span></Label>
+                <Input id="oroMin" type="number" min="2" value={String(form.oroMin)} onChange={(e) => setField("oroMin", Number(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label htmlFor="plataMin"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gray-400" />Plata desde</span></Label>
+                <Input id="plataMin" type="number" min="1" value={String(form.plataMin)} onChange={(e) => setField("plataMin", Number(e.target.value) || 0)} />
+              </div>
+            </div>
+            {!formValido && (
+              <p className="mt-1.5 text-xs text-error-500">El mínimo de Oro debe ser mayor que el de Plata, y Plata al menos 1.</p>
+            )}
+            <p className="mt-1.5 text-xs text-gray-400">Bronce es todo lo que esté por debajo del mínimo de Plata.</p>
+          </div>
+
+          {/* Riesgo */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Cuándo marcar “En riesgo”</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="riesgoNoShows">Inasistencias</Label>
+                <Input id="riesgoNoShows" type="number" min="1" value={String(form.riesgoNoShows)} onChange={(e) => setField("riesgoNoShows", Number(e.target.value) || 0)} />
+              </div>
+              <div>
+                <Label htmlFor="riesgoInactivoDias">Días sin volver</Label>
+                <Input id="riesgoInactivoDias" type="number" min="1" value={String(form.riesgoInactivoDias)} onChange={(e) => setField("riesgoInactivoDias", Number(e.target.value) || 0)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Cupones / recompensas */}
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Cupones / recompensas por nivel</p>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="recompensaOro"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-warning-400" />Oro</span></Label>
+                <Input id="recompensaOro" value={form.recompensaOro} onChange={(e) => setField("recompensaOro", e.target.value)} placeholder="Ej: Sesión de cortesía o 20% de descuento" />
+              </div>
+              <div>
+                <Label htmlFor="recompensaPlata"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gray-400" />Plata</span></Label>
+                <Input id="recompensaPlata" value={form.recompensaPlata} onChange={(e) => setField("recompensaPlata", e.target.value)} placeholder="Ej: 10% de descuento" />
+              </div>
+              <div>
+                <Label htmlFor="recompensaBronce"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-light-400" />Bronce</span></Label>
+                <Input id="recompensaBronce" value={form.recompensaBronce} onChange={(e) => setField("recompensaBronce", e.target.value)} placeholder="Ej: Bienvenida 5%" />
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">Deja un cupón vacío si ese nivel no recibe recompensa.</p>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+          <Button size="sm" disabled={!formValido} onClick={guardarConfig}>Guardar</Button>
+        </div>
+      </Modal>
     </>
   );
 });

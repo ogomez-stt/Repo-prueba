@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams, Link } from "react-router";
 import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Button } from "@/elements/ui/button";
@@ -99,23 +99,25 @@ const CitaCard = observer(({ cita, onOpen }: { cita: Cita; onOpen: () => void })
 
 export const AgendaPage = observer(() => {
   const navigate = useNavigate();
-  const [profFilter, setProfFilter] = useState("all");
+  const [searchParams] = useSearchParams();
   const [estadoFilter, setEstadoFilter] = useState<CitaEstado | "all">("all");
 
+  // Profesional actual: del ?prof= o el primero disponible.
+  const profId = searchParams.get("prof") || agendaStore.profesionales[0]?.id || "";
+  const prof = agendaStore.getProfesional(profId);
+
+  // Solo citas de ESTE profesional (agenda independiente).
   const filtered = useMemo(() => {
     return agendaStore.upcoming.filter((c) => {
-      const mp = profFilter === "all" || c.profesionalId === profFilter;
+      const mismoProf = c.profesionalId === profId;
       const me = estadoFilter === "all" || c.estado === estadoFilter;
-      return mp && me;
+      return mismoProf && me;
     });
-  }, [profFilter, estadoFilter, agendaStore.citas.slice()]);
+  }, [profId, estadoFilter, agendaStore.citas.slice()]);
 
   const grupos = agendaStore.groupedByDay(filtered);
 
-  const profOptions = [
-    { value: "all", label: "Todos los profesionales" },
-    ...agendaStore.profesionales.map((p) => ({ value: p.id, label: p.nombre })),
-  ];
+  const profOptions = agendaStore.profesionales.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
   const estadoOptions = [
     { value: "all", label: "Todos los estados" },
     { value: "pendiente", label: "Pendiente" },
@@ -124,46 +126,75 @@ export const AgendaPage = observer(() => {
     { value: "cancelada", label: "Cancelada" },
   ];
 
+  // Sin profesionales: invita a crearlos.
+  if (!prof) {
+    return (
+      <>
+        <PageMeta title="Agenda" description="Agenda por profesional" />
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay profesionales</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea un profesional para gestionar su agenda de citas.</p>
+          <Button size="sm" className="mt-5" onClick={() => navigate("/agendamiento/profesionales")}>Ir a Profesionales</Button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <PageMeta title="Agenda" description="Gestiona las citas de tus profesionales" />
+      <PageMeta title={`Agenda de ${prof.nombre}`} description="Agenda del profesional" />
 
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Agenda</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Próximas citas de tus profesionales</p>
-        </div>
-        <Button size="sm" startIcon={<PlusIcon />} onClick={() => navigate("/agendamiento/crear")}>Agendar cita</Button>
+      {/* Volver a profesionales */}
+      <div className="mb-4">
+        <Link to="/agendamiento/profesionales" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Todos los profesionales
+        </Link>
       </div>
 
-      {/* KPIs — MetricCard de Elements */}
+      {/* Header con el profesional */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">{prof.nombre}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{prof.especialidad} · agenda de citas</p>
+          </div>
+        </div>
+        <Button size="sm" startIcon={<PlusIcon />} onClick={() => navigate(`/agendamiento/crear?prof=${prof.id}`)}>Agendar cita</Button>
+      </div>
+
+      {/* KPIs del profesional */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <MetricCard
           layout="horizontal"
           icon={<CalenderIcon className="size-6" />}
           title="Citas hoy"
-          value={String(agendaStore.citasHoy.length)}
+          value={String(agendaStore.citasHoyDe(prof.id))}
         />
         <MetricCard
           layout="horizontal"
           icon={<TimeIcon className="size-6" />}
           title="Por confirmar"
-          value={String(agendaStore.pendientesConfirmar)}
+          value={String(agendaStore.pendientesDe(prof.id))}
           iconBgClass="bg-warning-50 text-warning-600 dark:bg-warning-500/15"
         />
         <MetricCard
           layout="horizontal"
           icon={<GroupIcon className="size-6" />}
-          title="Virtuales hoy"
-          value={String(agendaStore.virtualesHoy)}
+          title="Total de citas"
+          value={String(agendaStore.citasDeProfesional(prof.id).length)}
           iconBgClass="bg-brand-50 text-brand-600 dark:bg-brand-500/15"
         />
       </div>
 
-      {/* Filtros */}
+      {/* Cambiar de profesional + filtro de estado */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <div className="sm:w-64"><Select defaultValue={profFilter} onChange={setProfFilter} options={profOptions} /></div>
+        <div className="sm:w-72">
+          <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento?prof=${v}`)} options={profOptions} />
+        </div>
         <div className="sm:w-56"><Select defaultValue={estadoFilter} onChange={(v) => setEstadoFilter(v as CitaEstado | "all")} options={estadoOptions} /></div>
       </div>
 
@@ -171,8 +202,8 @@ export const AgendaPage = observer(() => {
       <div className="mt-6 space-y-6">
         {grupos.length === 0 ? (
           <Card className="py-16 text-center">
-            <p className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay citas</p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">No hay citas con estos filtros.</p>
+            <p className="text-lg font-semibold text-gray-800 dark:text-white/90">Sin citas próximas</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{prof.nombre} no tiene citas con estos filtros.</p>
           </Card>
         ) : (
           grupos.map((g) => (

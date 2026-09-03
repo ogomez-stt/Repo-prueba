@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Card } from "@/elements/ui/card";
@@ -25,10 +25,14 @@ const WhatsAppIcon = () => (
 
 export const CrearCitaPage = observer(() => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preProf = searchParams.get("prof");
 
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [profesionalId, setProfesionalId] = useState(agendaStore.profesionales[0]?.id ?? "");
+  const [profesionalId, setProfesionalId] = useState(
+    (preProf && agendaStore.getProfesional(preProf) ? preProf : agendaStore.profesionales[0]?.id) ?? "",
+  );
   const [servicio, setServicio] = useState("");
   const [fecha, setFecha] = useState(todayIso());
   const [hora, setHora] = useState("09:00");

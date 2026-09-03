@@ -9,7 +9,7 @@ import { RecepcionPage } from "@/pages/recepcion";
 import { SurveyPage } from "@/pages/survey";
 import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
-import { AgendaPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
+import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
@@ -104,6 +104,7 @@ export default function App() {
         <Route path="/colas" element={<ColasPage />} />
         <Route path="/encuestas" element={<EncuestasPage />} />
         <Route path="/agendamiento" element={<AgendaPage />} />
+        <Route path="/agendamiento/profesionales" element={<ProfesionalesPage />} />
         <Route path="/agendamiento/calendario" element={<CalendarioPage />} />
         <Route path="/agendamiento/detalles" element={<CitaDetallePage />} />
         <Route path="/agendamiento/crear" element={<CrearCitaPage />} />

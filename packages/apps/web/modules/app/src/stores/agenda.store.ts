@@ -69,6 +69,22 @@ export interface CalendarConfig {
   duracionSlot: number; // minutes per slot (30 or 60)
 }
 
+/** Editable loyalty program: thresholds per tier + the reward/coupon text each one gets. */
+export interface LoyaltyConfig {
+  /** Min completed appointments to reach Gold. */
+  oroMin: number;
+  /** Min completed appointments to reach Silver. */
+  plataMin: number;
+  /** No-shows that flag a client as "at risk". */
+  riesgoNoShows: number;
+  /** Days without returning that flag a recurring client as "at risk". */
+  riesgoInactivoDias: number;
+  /** Reward/coupon text offered to each tier (empty = no reward for that tier). */
+  recompensaOro: string;
+  recompensaPlata: string;
+  recompensaBronce: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DATE HELPERS  (relative to "today" so the mock always stays coherent)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -140,12 +156,27 @@ class AgendaStore {
     duracionSlot: 60,
   };
 
+  /** Loyalty program config (editable from the analytics view). */
+  loyaltyConfig: LoyaltyConfig = {
+    oroMin: 6,
+    plataMin: 3,
+    riesgoNoShows: 2,
+    riesgoInactivoDias: 45,
+    recompensaOro: "Sesión de cortesía o 20% de descuento",
+    recompensaPlata: "10% de descuento en su próxima cita",
+    recompensaBronce: "Bienvenida: 5% en la siguiente",
+  };
+
   constructor() {
     makeAutoObservable(this);
   }
 
   updateCalendarConfig(data: Partial<CalendarConfig>): void {
     this.calendarConfig = { ...this.calendarConfig, ...data };
+  }
+
+  updateLoyaltyConfig(data: Partial<LoyaltyConfig>): void {
+    this.loyaltyConfig = { ...this.loyaltyConfig, ...data };
   }
 
   /** True if the given ISO date falls on a configured working weekday. */
@@ -312,8 +343,6 @@ class AgendaStore {
   // LOYALTY / FIDELIDAD  (regularity-based tiers & rewards)
   // ═══════════════════════════════════════════════════════════════════════
 
-  private static readonly INACTIVO_DIAS = 45; // sin volver → en riesgo
-
   /** Days since the client last had (or has) a cita, using citas history. */
   private diasDesdeUltimaCita(clienteId: string): number {
     const fechas = this.citas
@@ -333,32 +362,35 @@ class AgendaStore {
   }
 
   /**
-   * Loyalty tier from regularity:
-   * - riesgo: 2+ no-shows, o inactivo > 45 días teniendo historial
-   * - oro:    6+ citas completadas
-   * - plata:  3–5 completadas
-   * - bronce: 1–2 (recién llega)
+   * Loyalty tier from regularity, using the editable loyaltyConfig thresholds:
+   * - riesgo: riesgoNoShows+ no-shows, o inactivo > riesgoInactivoDias con historial
+   * - oro:    oroMin+ citas completadas
+   * - plata:  plataMin+ completadas
+   * - bronce: por debajo de plataMin (recién llega)
    */
   tierDeCliente(c: Cliente): Tier {
+    const cfg = this.loyaltyConfig;
     const dias = this.diasDesdeUltimaCita(c.id);
-    if (c.noShows >= 2) return "riesgo";
-    if (c.totalCitas > 1 && dias > AgendaStore.INACTIVO_DIAS && dias !== Infinity) return "riesgo";
-    if (c.completadas >= 6) return "oro";
-    if (c.completadas >= 3) return "plata";
+    if (c.noShows >= cfg.riesgoNoShows) return "riesgo";
+    if (c.totalCitas > 1 && dias > cfg.riesgoInactivoDias && dias !== Infinity) return "riesgo";
+    if (c.completadas >= cfg.oroMin) return "oro";
+    if (c.completadas >= cfg.plataMin) return "plata";
     return "bronce";
   }
 
   private recompensaDe(c: Cliente, tier: Tier): string | null {
-    if (tier === "oro") return "Sesión de cortesía o 20% de descuento";
-    if (tier === "plata") return "10% de descuento en su próxima cita";
-    if (tier === "bronce" && c.completadas >= 2) return "Bienvenida: 5% en la siguiente";
+    const cfg = this.loyaltyConfig;
+    if (tier === "oro") return cfg.recompensaOro || null;
+    if (tier === "plata") return cfg.recompensaPlata || null;
+    if (tier === "bronce" && c.completadas >= 2) return cfg.recompensaBronce || null;
     return null;
   }
 
   private motivoRiesgoDe(c: Cliente): string | null {
-    if (c.noShows >= 2) return `${c.noShows} inasistencias`;
+    const cfg = this.loyaltyConfig;
+    if (c.noShows >= cfg.riesgoNoShows) return `${c.noShows} inasistencias`;
     const dias = this.diasDesdeUltimaCita(c.id);
-    if (c.totalCitas > 1 && dias > AgendaStore.INACTIVO_DIAS && dias !== Infinity) {
+    if (c.totalCitas > 1 && dias > cfg.riesgoInactivoDias && dias !== Infinity) {
       return `Sin volver hace ${dias} días`;
     }
     return null;
@@ -472,6 +504,60 @@ class AgendaStore {
     };
     this.citas.push(cita);
     return cita;
+  }
+
+  // ── Profesionales CRUD (mock) ──
+  private static readonly PROF_COLORS = ["bg-brand-500", "bg-secondary-500", "bg-accent-500", "bg-warning-500", "bg-success-500", "bg-blue-light-500"];
+
+  private inicialesDe(nombre: string): string {
+    const parts = nombre.trim().split(/\s+/);
+    const first = parts[0]?.[0] ?? "";
+    const second = parts.length > 1 ? parts[parts.length - 1][0] : (parts[0]?.[1] ?? "");
+    return (first + second).toUpperCase();
+  }
+
+  crearProfesional(data: { nombre: string; especialidad: string; color?: string }): Profesional {
+    const color = data.color ?? AgendaStore.PROF_COLORS[this.profesionales.length % AgendaStore.PROF_COLORS.length];
+    const prof: Profesional = {
+      id: crypto.randomUUID(),
+      nombre: data.nombre,
+      especialidad: data.especialidad,
+      color,
+      avatar: this.inicialesDe(data.nombre),
+    };
+    this.profesionales.push(prof);
+    return prof;
+  }
+
+  updateProfesional(id: string, data: { nombre?: string; especialidad?: string; color?: string }): void {
+    const p = this.getProfesional(id);
+    if (!p) return;
+    if (data.nombre !== undefined) { p.nombre = data.nombre; p.avatar = this.inicialesDe(data.nombre); }
+    if (data.especialidad !== undefined) p.especialidad = data.especialidad;
+    if (data.color !== undefined) p.color = data.color;
+  }
+
+  deleteProfesional(id: string): void {
+    this.profesionales = this.profesionales.filter((p) => p.id !== id);
+  }
+
+  /** Colors available for professional avatars. */
+  get profColorOptions(): string[] {
+    return AgendaStore.PROF_COLORS;
+  }
+
+  /** Non-cancelled citas of a professional. */
+  citasDeProfesional(profId: string): Cita[] {
+    return this.citas.filter((c) => c.profesionalId === profId && c.estado !== "cancelada");
+  }
+
+  /** Count of a professional's upcoming (today onward) citas. */
+  citasHoyDe(profId: string): number {
+    const t = todayIso();
+    return this.citas.filter((c) => c.profesionalId === profId && c.fecha === t && c.estado !== "cancelada").length;
+  }
+  pendientesDe(profId: string): number {
+    return this.citas.filter((c) => c.profesionalId === profId && c.estado === "pendiente").length;
   }
 
   // ── Display helpers ──
