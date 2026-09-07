@@ -197,27 +197,31 @@ class AgendaStore {
   }
 
   // ── Calendar helpers ──
-  /** Non-cancelled citas on a given ISO day, sorted by time. */
-  citasDelDia(fecha: string): Cita[] {
+  /**
+   * Non-cancelled citas on a given ISO day, sorted by time.
+   * If profId is given, only that professional's citas.
+   */
+  citasDelDia(fecha: string, profId?: string): Cita[] {
     return this.citas
-      .filter((c) => c.fecha === fecha && c.estado !== "cancelada")
+      .filter((c) => c.fecha === fecha && c.estado !== "cancelada" && (!profId || c.profesionalId === profId))
       .sort((a, b) => a.hora.localeCompare(b.hora));
   }
 
-  /** Count of non-cancelled citas per ISO day (for month dots). */
-  countByDay(fecha: string): number {
-    return this.citas.filter((c) => c.fecha === fecha && c.estado !== "cancelada").length;
+  /** Count of non-cancelled citas per ISO day (for month dots), optionally per professional. */
+  countByDay(fecha: string, profId?: string): number {
+    return this.citas.filter((c) => c.fecha === fecha && c.estado !== "cancelada" && (!profId || c.profesionalId === profId)).length;
   }
 
   /**
    * Free time slots for a day, respecting the calendar config (working days,
    * hour range and slot duration), excluding times already taken by a cita.
+   * If profId is given, occupancy is computed per professional.
    * Returns [] on non-working days.
    */
-  horariosDisponibles(fecha: string): string[] {
+  horariosDisponibles(fecha: string, profId?: string): string[] {
     if (!this.esDiaLaboral(fecha)) return [];
     const { horaInicio, horaFin, duracionSlot } = this.calendarConfig;
-    const ocupadas = new Set(this.citasDelDia(fecha).map((c) => c.hora));
+    const ocupadas = new Set(this.citasDelDia(fecha, profId).map((c) => c.hora));
     const slots: string[] = [];
     for (let mins = horaInicio * 60; mins < horaFin * 60; mins += duracionSlot) {
       const hh = String(Math.floor(mins / 60)).padStart(2, "0");

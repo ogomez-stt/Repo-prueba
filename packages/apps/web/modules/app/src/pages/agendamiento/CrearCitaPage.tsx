@@ -42,6 +42,7 @@ export const CrearCitaPage = observer(() => {
   const [created, setCreated] = useState<Cita | null>(null);
 
   const profOptions = agendaStore.profesionales.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
+  const profSel = agendaStore.getProfesional(profesionalId);
 
   const resetForm = () => {
     setCliente(""); setTelefono(""); setServicio(""); setFecha(todayIso());
@@ -119,6 +120,21 @@ export const CrearCitaPage = observer(() => {
       <div className="mx-auto max-w-2xl">
         <Card>
           <div className="space-y-5">
+            {/* Profesional al que pertenece la cita */}
+            <div>
+              <Label htmlFor="prof">Profesional <RequiredMark /></Label>
+              <Select defaultValue={profesionalId} onChange={setProfesionalId} options={profOptions} />
+              {profSel && (
+                <div className="mt-2 flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${profSel.color}`}>{profSel.avatar}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 dark:text-white/90">{profSel.nombre}</p>
+                    <p className="text-xs text-gray-400">{profSel.especialidad}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label htmlFor="cliente">Nombre del cliente <RequiredMark /></Label>
@@ -130,15 +146,9 @@ export const CrearCitaPage = observer(() => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="prof">Profesional <RequiredMark /></Label>
-                <Select defaultValue={profesionalId} onChange={setProfesionalId} options={profOptions} />
-              </div>
-              <div>
-                <Label htmlFor="servicio">Servicio <RequiredMark /></Label>
-                <Input id="servicio" placeholder="Ej: Terapia individual" value={servicio} onChange={(e) => setServicio(e.target.value)} error={!!errors.servicio} hint={errors.servicio} />
-              </div>
+            <div>
+              <Label htmlFor="servicio">Servicio <RequiredMark /></Label>
+              <Input id="servicio" placeholder="Ej: Terapia individual" value={servicio} onChange={(e) => setServicio(e.target.value)} error={!!errors.servicio} hint={errors.servicio} />
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

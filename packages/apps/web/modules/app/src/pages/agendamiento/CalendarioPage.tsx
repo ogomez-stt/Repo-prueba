@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams, Link } from "react-router";
 import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
 import { Card } from "@/elements/ui/card";
@@ -33,17 +33,21 @@ const HORA_OPTS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), labe
 
 export const CalendarioPage = observer(() => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [selected, setSelected] = useState<string>(todayIso());
 
-  // Nueva cita (desde un slot libre)
+  // Profesional actual: del ?prof= o el primero disponible. El calendario es de ese profesional.
+  const profId = searchParams.get("prof") || agendaStore.profesionales[0]?.id || "";
+  const prof = agendaStore.getProfesional(profId);
+
+  // Nueva cita (desde un slot libre) — el profesional lo fija el calendario actual
   const [crearOpen, setCrearOpen] = useState(false);
   const [slotHora, setSlotHora] = useState("");
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [profesionalId, setProfesionalId] = useState(agendaStore.profesionales[0]?.id ?? "");
   const [servicio, setServicio] = useState("");
   const [modalidad, setModalidad] = useState<Modalidad>("presencial");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -86,14 +90,13 @@ export const CalendarioPage = observer(() => {
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
   const goToday = () => { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelected(todayIso()); };
 
-  const citasDia = agendaStore.citasDelDia(selected);
-  const slots = agendaStore.horariosDisponibles(selected);
+  const citasDia = agendaStore.citasDelDia(selected, profId);
+  const slots = agendaStore.horariosDisponibles(selected, profId);
   const selectedLegible = new Date(selected + "T00:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
 
   const openCrear = (hora: string) => {
     setSlotHora(hora);
     setCliente(""); setTelefono(""); setServicio(""); setModalidad("presencial");
-    setProfesionalId(agendaStore.profesionales[0]?.id ?? "");
     setErrors({});
     setCrearOpen(true);
   };
@@ -105,22 +108,53 @@ export const CalendarioPage = observer(() => {
     if (!servicio.trim()) e.servicio = "Servicio obligatorio";
     setErrors(e);
     if (Object.keys(e).length > 0) return;
-    agendaStore.crearCita({ cliente: cliente.trim(), telefono: telefono.trim(), profesionalId, servicio: servicio.trim(), fecha: selected, hora: slotHora, modalidad });
+    agendaStore.crearCita({ cliente: cliente.trim(), telefono: telefono.trim(), profesionalId: profId, servicio: servicio.trim(), fecha: selected, hora: slotHora, modalidad });
     setCrearOpen(false);
   };
 
+  if (!prof) {
+    return (
+      <>
+        <PageMeta title="Calendario" description="Vista mensual de citas" />
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay profesionales</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea un profesional para ver su calendario de citas.</p>
+          <Button size="sm" className="mt-5" onClick={() => navigate("/agendamiento/profesionales")}>Ir a Profesionales</Button>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <PageMeta title="Calendario" description="Vista mensual de citas" />
+      <PageMeta title={`Calendario de ${prof.nombre}`} description="Vista mensual de citas del profesional" />
+
+      {/* Volver a profesionales */}
+      <div className="mb-4">
+        <Link to="/agendamiento/profesionales" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Todos los profesionales
+        </Link>
+      </div>
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Calendario</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Elige un día para ver o agendar citas</p>
+        <div className="flex items-center gap-3">
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Calendario</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{prof.nombre} · {prof.especialidad}</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={goToday}>Hoy</Button>
-          <Button size="sm" variant="outline" startIcon={<GearIcon />} onClick={openConfig}>Configurar</Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="sm:w-56">
+            <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)} options={agendaStore.profesionales.map((p) => ({ value: p.id, label: p.nombre }))} />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={goToday}>Hoy</Button>
+            <Button size="sm" variant="outline" startIcon={<GearIcon />} onClick={openConfig}>Configurar</Button>
+          </div>
         </div>
       </div>
 
@@ -153,7 +187,7 @@ export const CalendarioPage = observer(() => {
               {cells.map((d, i) => {
                 if (d === null) return <div key={i} />;
                 const iso = isoOf(year, month, d);
-                const count = agendaStore.countByDay(iso);
+                const count = agendaStore.countByDay(iso, profId);
                 const isToday = iso === todayIso();
                 const isSelected = iso === selected;
                 const laboral = agendaStore.esDiaLaboral(iso);
@@ -250,7 +284,17 @@ export const CalendarioPage = observer(() => {
       {/* Modal crear cita en el slot */}
       <Modal isOpen={crearOpen} onClose={() => setCrearOpen(false)} className="max-w-[480px] p-6">
         <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Agendar cita</h4>
-        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400 capitalize">{selectedLegible} · {slotHora}</p>
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 capitalize">{selectedLegible} · {slotHora}</p>
+
+        {/* Profesional del calendario (fijo) */}
+        <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+          <div>
+            <p className="text-sm font-medium text-gray-800 dark:text-white/90">{prof.nombre}</p>
+            <p className="text-xs text-gray-400">{prof.especialidad}</p>
+          </div>
+        </div>
+
         <div className="space-y-4">
           <div>
             <Label htmlFor="cal-cliente">Cliente <RequiredMark /></Label>
@@ -260,15 +304,9 @@ export const CalendarioPage = observer(() => {
             <Label htmlFor="cal-tel">Teléfono (WhatsApp) <RequiredMark /></Label>
             <Input id="cal-tel" placeholder="+57 300 123 4567" value={telefono} onChange={(e) => setTelefono(e.target.value)} error={!!errors.telefono} hint={errors.telefono} />
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="cal-prof">Profesional</Label>
-              <Select defaultValue={profesionalId} onChange={setProfesionalId} options={agendaStore.profesionales.map((p) => ({ value: p.id, label: p.nombre }))} />
-            </div>
-            <div>
-              <Label htmlFor="cal-serv">Servicio <RequiredMark /></Label>
-              <Input id="cal-serv" placeholder="Ej: Terapia individual" value={servicio} onChange={(e) => setServicio(e.target.value)} error={!!errors.servicio} hint={errors.servicio} />
-            </div>
+          <div>
+            <Label htmlFor="cal-serv">Servicio <RequiredMark /></Label>
+            <Input id="cal-serv" placeholder="Ej: Terapia individual" value={servicio} onChange={(e) => setServicio(e.target.value)} error={!!errors.servicio} hint={errors.servicio} />
           </div>
           <div>
             <Label htmlFor="cal-mod">Modalidad</Label>
