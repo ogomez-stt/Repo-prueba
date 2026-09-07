@@ -30,13 +30,17 @@ NECTO tiene dos módulos: **Turnos** (fila de atención en vivo del día) y
 
 ### Agendamiento (citas con profesionales)
 
+Cada profesional tiene su **agenda independiente**. Agenda y Calendario trabajan por
+profesional (`?prof=<id>`).
+
 | Ruta | Vista | Descripcion |
 |------|-------|-------------|
-| `/agendamiento` | Agenda | Lista de citas agrupada por dia, filtros por profesional/estado, acciones rapidas |
-| `/agendamiento/calendario` | Calendario | Vista mensual clickeable + panel del dia + configuracion de horarios laborales |
-| `/agendamiento/crear` | Agendar cita | Formulario del operador (con DatePicker), presencial/virtual, telefono obligatorio |
+| `/agendamiento/profesionales` | Profesionales | Gestion de trabajadores (crear/editar/eliminar, avatar+color) |
+| `/agendamiento` | Agenda | Citas de un profesional agrupadas por dia, KPIs propios, acciones rapidas |
+| `/agendamiento/calendario` | Calendario | Vista mensual de un profesional + panel del dia + config de horarios |
+| `/agendamiento/crear` | Agendar cita | Formulario (con DatePicker), muestra el profesional, presencial/virtual |
 | `/agendamiento/detalles` | Detalle de cita | Datos + acciones admin (confirmar/reagendar/cancelar/completar/WhatsApp) |
-| `/agendamiento/analitica` | Analitica | Regularidad de clientes + sistema de fidelidad/recompensas (Oro/Plata/Bronce/En riesgo) |
+| `/agendamiento/analitica` | Analitica | Regularidad + fidelidad/recompensas configurables (Oro/Plata/Bronce/En riesgo) |
 
 ### Campos personalizados por cola
 
