@@ -6,6 +6,7 @@ import {
   MenuItem,
 } from "@/shell";
 import { useSidebarContext } from "@/shell/sidebar/SidebarContext";
+import { sessionStore } from "@/stores";
 import {
   GridIcon,
   TaskIcon,
@@ -105,42 +106,59 @@ const SidebarFooter = observer(() => {
 // SIDEBAR CONTENT — Sistema de Turnos
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SidebarContent = () => {
+const SidebarContent = observer(() => {
   const { pathname } = useLocation();
   const isActive = (path: string) => pathname === path;
+
+  // El menú se adapta a los módulos que el usuario eligió en /seleccionar.
+  // Si aún no hay selección (p. ej. entró por una URL directa), mostramos
+  // ambas secciones para no dejar el sidebar vacío.
+  const sinSeleccion = sessionStore.modulos.length === 0;
+  const verTurnos = sinSeleccion || sessionStore.hasModulo("turnos");
+  const verAgendamiento = sinSeleccion || sessionStore.hasModulo("agendamiento");
 
   return (
     <nav className="flex flex-col flex-1">
       <div className="flex flex-col gap-6">
         {/* TURNOS */}
-        <div>
-          <MenuSectionHeader title="Turnos" />
-          <ul className="flex flex-col gap-1">
-            <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
-            <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
-            <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />
-            <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
-            <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
-          </ul>
-        </div>
+        {verTurnos && (
+          <div>
+            <MenuSectionHeader title="Turnos" />
+            <ul className="flex flex-col gap-1">
+              <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
+              <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
+              <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />
+              <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
+              <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
+              {sessionStore.isAdmin && (
+                <MenuItem icon={<GroupIcon />} name="Operadores" path="/turnos/operadores" isActive={isActive} />
+              )}
+            </ul>
+          </div>
+        )}
 
         {/* AGENDAMIENTO */}
-        <div>
-          <MenuSectionHeader title="Agendamiento" />
-          <ul className="flex flex-col gap-1">
-            <MenuItem icon={<GroupIcon />} name="Profesionales" path="/agendamiento/profesionales" isActive={isActive} />
-            <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
-            <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />
-            <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />
-            <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />
-          </ul>
-        </div>
+        {verAgendamiento && (
+          <div>
+            <MenuSectionHeader title="Agendamiento" />
+            <ul className="flex flex-col gap-1">
+              <MenuItem icon={<GroupIcon />} name="Profesionales" path="/agendamiento/profesionales" isActive={isActive} />
+              <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
+              <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />
+              <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />
+              <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />
+              {sessionStore.isAdmin && (
+                <MenuItem icon={<GroupIcon />} name="Operadores" path="/agendamiento/operadores" isActive={isActive} />
+              )}
+            </ul>
+          </div>
+        )}
       </div>
 
       <SidebarFooter />
     </nav>
   );
-};
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN EXPORT

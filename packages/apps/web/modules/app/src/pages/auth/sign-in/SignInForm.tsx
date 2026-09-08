@@ -5,6 +5,7 @@ import { Label } from "@/elements/form/label";
 import { Input } from "@/elements/form/input";
 import { Checkbox } from "@/elements/form/checkbox";
 import { Button } from "@/elements/ui/button";
+import { sessionStore } from "@/stores";
 
 /**
  * @kgId 07b80348fc4c
@@ -17,7 +18,14 @@ export default function SignInForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: integrate with Cognito auth
-    navigate("/dashboard");
+    // Flujo de arranque (mock): si aun no se eligio modulo + rol, primero el
+    // usuario pasa por la vista de seleccion. Si ya esta configurado, entra
+    // directo al modulo elegido.
+    if (sessionStore.isReady) {
+      navigate(sessionStore.moduloEntryPath);
+    } else {
+      navigate("/seleccionar");
+    }
   };
 
   return (

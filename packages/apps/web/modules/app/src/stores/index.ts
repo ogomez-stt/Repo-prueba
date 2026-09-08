@@ -8,3 +8,9 @@ export type { Queue, Ticket, TicketState, AttentionMode, Saturation, Survey, Sen
 
 export { agendaStore, AgendaStore, todayIso } from '@/stores/agenda.store';
 export type { Profesional, Cita, Cliente, CitaEstado, Modalidad, CalendarConfig, LoyaltyConfig, Tier, ClienteFidelidad } from '@/stores/agenda.store';
+
+export { sessionStore, SessionStore } from '@/stores/session.store';
+export type { Modulo, Rol } from '@/stores/session.store';
+
+export { operadoresStore, OperadoresStore, SECCIONES } from '@/stores/operadores.store';
+export type { Operador, OperadorEstado, Seccion } from '@/stores/operadores.store';

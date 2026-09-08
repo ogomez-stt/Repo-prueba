@@ -10,6 +10,9 @@ import { SurveyPage } from "@/pages/survey";
 import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
+import { SeleccionarPage } from "@/pages/seleccionar";
+import { OperadorRegistroPage } from "@/pages/operador";
+import { OperadoresTurnosPage, OperadoresAgendamientoPage } from "@/pages/operadores";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
@@ -103,12 +106,14 @@ export default function App() {
         <Route path="/recepcion" element={<RecepcionPage />} />
         <Route path="/colas" element={<ColasPage />} />
         <Route path="/encuestas" element={<EncuestasPage />} />
+        <Route path="/turnos/operadores" element={<OperadoresTurnosPage />} />
         <Route path="/agendamiento" element={<AgendaPage />} />
         <Route path="/agendamiento/profesionales" element={<ProfesionalesPage />} />
         <Route path="/agendamiento/calendario" element={<CalendarioPage />} />
         <Route path="/agendamiento/detalles" element={<CitaDetallePage />} />
         <Route path="/agendamiento/crear" element={<CrearCitaPage />} />
         <Route path="/agendamiento/analitica" element={<AnaliticaPage />} />
+        <Route path="/agendamiento/operadores" element={<OperadoresAgendamientoPage />} />
         <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
         <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>
@@ -117,6 +122,8 @@ export default function App() {
           RUTAS STANDALONE
           Páginas sin shell - tienen su propio layout completo
           ════════════════════════════════════════════════════════════════════ */}
+      <Route path="/seleccionar" element={<SeleccionarPage />} />
+      <Route path="/operador/registro" element={<OperadorRegistroPage />} />
       <Route path="/display" element={<DisplayScreen />} />
       <Route path="/s/:token" element={<SurveyPage />} />
       <Route path="/login" element={<AuthPageLayout><SignInForm /></AuthPageLayout>} />
