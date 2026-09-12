@@ -274,6 +274,12 @@ export const SeleccionarPage = observer(() => {
                 <StepDots step={2} />
                 <div className="flex items-center gap-3">
                   <Button size="sm" variant="outline" onClick={() => setStep(1)}>Atrás</Button>
+                  {/* Simular: solo tiene sentido para el rol operador (mock). */}
+                  {rol === "operador" && (
+                    <Button size="sm" variant="outline" onClick={() => navigate("/operador/login")}>
+                      Simular
+                    </Button>
+                  )}
                   <Button size="sm" disabled={!rol} onClick={confirmar}>Entrar</Button>
                 </div>
               </div>

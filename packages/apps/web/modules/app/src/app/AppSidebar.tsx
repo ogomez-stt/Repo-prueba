@@ -106,6 +106,57 @@ const SidebarFooter = observer(() => {
 // SIDEBAR CONTENT — Sistema de Turnos
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMULATION BANNER — indicador de "modo simulación" con salida
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SimulacionBanner = observer(() => {
+  const { isExpanded: showExpanded } = useSidebarContext();
+  const navigate = useNavigate();
+
+  if (!sessionStore.isSimulando) return null;
+
+  const nombre = sessionStore.operadorSimulado?.nombre ?? "Operador";
+
+  const salir = () => {
+    // "Volver al principio de todo": limpia la simulación y regresa al login.
+    sessionStore.salirSimulacion();
+    navigate("/login");
+  };
+
+  return (
+    <div className="mb-4 rounded-lg border border-warning-300 bg-warning-50 p-3 dark:border-warning-500/40 dark:bg-warning-500/10">
+      {showExpanded ? (
+        <>
+          <p className="text-xs font-semibold uppercase tracking-wider text-warning-600 dark:text-orange-400">
+            Modo simulación
+          </p>
+          <p className="mt-1 truncate text-sm font-medium text-gray-800 dark:text-white/90">{nombre}</p>
+          <button
+            onClick={salir}
+            className="mt-2 text-xs font-medium text-warning-600 underline hover:text-warning-700 dark:text-orange-400"
+          >
+            Salir de simulación
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={salir}
+          aria-label="Salir de simulación"
+          className="flex w-full items-center justify-center text-warning-600 dark:text-orange-400"
+          title="Modo simulación — salir"
+        >
+          <ArrowRightIcon />
+        </button>
+      )}
+    </div>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR CONTENT — Sistema de Turnos
+// ═══════════════════════════════════════════════════════════════════════════
+
 const SidebarContent = observer(() => {
   const { pathname } = useLocation();
   const isActive = (path: string) => pathname === path;
@@ -117,19 +168,25 @@ const SidebarContent = observer(() => {
   const verTurnos = sinSeleccion || sessionStore.hasModulo("turnos");
   const verAgendamiento = sinSeleccion || sessionStore.hasModulo("agendamiento");
 
+  // En modo simulación, cada sección solo se muestra si el operador la tiene
+  // permitida. Fuera de simulación (admin), puedeVer() siempre devuelve true.
+  const puede = (seccionId: string) => sessionStore.puedeVer(seccionId);
+
   return (
     <nav className="flex flex-col flex-1">
+      <SimulacionBanner />
+
       <div className="flex flex-col gap-6">
         {/* TURNOS */}
         {verTurnos && (
           <div>
             <MenuSectionHeader title="Turnos" />
             <ul className="flex flex-col gap-1">
-              <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />
-              <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />
-              <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />
-              <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />
-              <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />
+              {puede("inicio") && <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />}
+              {puede("turnos") && <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />}
+              {puede("recepcion") && <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />}
+              {puede("colas") && <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />}
+              {puede("encuestas") && <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />}
               {sessionStore.isAdmin && (
                 <MenuItem icon={<GroupIcon />} name="Operadores" path="/turnos/operadores" isActive={isActive} />
               )}
@@ -142,11 +199,11 @@ const SidebarContent = observer(() => {
           <div>
             <MenuSectionHeader title="Agendamiento" />
             <ul className="flex flex-col gap-1">
-              <MenuItem icon={<GroupIcon />} name="Profesionales" path="/agendamiento/profesionales" isActive={isActive} />
-              <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />
-              <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />
-              <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />
-              <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />
+              {puede("profesionales") && <MenuItem icon={<GroupIcon />} name="Profesionales" path="/agendamiento/profesionales" isActive={isActive} />}
+              {puede("agenda") && <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />}
+              {puede("calendario") && <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />}
+              {puede("crear") && <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />}
+              {puede("analitica") && <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />}
               {sessionStore.isAdmin && (
                 <MenuItem icon={<GroupIcon />} name="Operadores" path="/agendamiento/operadores" isActive={isActive} />
               )}

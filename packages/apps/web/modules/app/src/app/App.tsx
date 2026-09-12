@@ -11,8 +11,9 @@ import { EncuestasPage } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { SeleccionarPage } from "@/pages/seleccionar";
-import { OperadorRegistroPage } from "@/pages/operador";
+import { OperadorRegistroPage, OperadorLoginPage } from "@/pages/operador";
 import { OperadoresTurnosPage, OperadoresAgendamientoPage } from "@/pages/operadores";
+import { SeccionGuard } from "@/app/SeccionGuard";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import SignInForm from "@/pages/auth/sign-in";
 import SignUpForm from "@/pages/auth/sign-up";
@@ -101,19 +102,23 @@ export default function App() {
           Páginas que comparten el layout AppShell (sidebar + header)
           ════════════════════════════════════════════════════════════════════ */}
       <Route element={<AppShell />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/turnos" element={<TurnosPage />} />
-        <Route path="/recepcion" element={<RecepcionPage />} />
-        <Route path="/colas" element={<ColasPage />} />
-        <Route path="/encuestas" element={<EncuestasPage />} />
-        <Route path="/turnos/operadores" element={<OperadoresTurnosPage />} />
-        <Route path="/agendamiento" element={<AgendaPage />} />
-        <Route path="/agendamiento/profesionales" element={<ProfesionalesPage />} />
-        <Route path="/agendamiento/calendario" element={<CalendarioPage />} />
-        <Route path="/agendamiento/detalles" element={<CitaDetallePage />} />
-        <Route path="/agendamiento/crear" element={<CrearCitaPage />} />
-        <Route path="/agendamiento/analitica" element={<AnaliticaPage />} />
-        <Route path="/agendamiento/operadores" element={<OperadoresAgendamientoPage />} />
+        {/* Turnos — protegidas por SeccionGuard en modo simulación */}
+        <Route path="/dashboard" element={<SeccionGuard seccion="inicio"><DashboardPage /></SeccionGuard>} />
+        <Route path="/turnos" element={<SeccionGuard seccion="turnos"><TurnosPage /></SeccionGuard>} />
+        <Route path="/recepcion" element={<SeccionGuard seccion="recepcion"><RecepcionPage /></SeccionGuard>} />
+        <Route path="/colas" element={<SeccionGuard seccion="colas"><ColasPage /></SeccionGuard>} />
+        <Route path="/encuestas" element={<SeccionGuard seccion="encuestas"><EncuestasPage /></SeccionGuard>} />
+        {/* Agendamiento — protegidas por SeccionGuard en modo simulación */}
+        <Route path="/agendamiento" element={<SeccionGuard seccion="agenda"><AgendaPage /></SeccionGuard>} />
+        <Route path="/agendamiento/profesionales" element={<SeccionGuard seccion="profesionales"><ProfesionalesPage /></SeccionGuard>} />
+        <Route path="/agendamiento/calendario" element={<SeccionGuard seccion="calendario"><CalendarioPage /></SeccionGuard>} />
+        <Route path="/agendamiento/detalles" element={<SeccionGuard seccion="agenda"><CitaDetallePage /></SeccionGuard>} />
+        <Route path="/agendamiento/crear" element={<SeccionGuard seccion="crear"><CrearCitaPage /></SeccionGuard>} />
+        <Route path="/agendamiento/analitica" element={<SeccionGuard seccion="analitica"><AnaliticaPage /></SeccionGuard>} />
+        {/* Solo admin — un operador simulado nunca tiene esta "sección", así que
+            SeccionGuard muestra el aviso de sin acceso si intenta entrar por URL */}
+        <Route path="/turnos/operadores" element={<SeccionGuard seccion="__solo_admin__"><OperadoresTurnosPage /></SeccionGuard>} />
+        <Route path="/agendamiento/operadores" element={<SeccionGuard seccion="__solo_admin__"><OperadoresAgendamientoPage /></SeccionGuard>} />
         <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
         <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>
@@ -124,6 +129,7 @@ export default function App() {
           ════════════════════════════════════════════════════════════════════ */}
       <Route path="/seleccionar" element={<SeleccionarPage />} />
       <Route path="/operador/registro" element={<OperadorRegistroPage />} />
+      <Route path="/operador/login" element={<OperadorLoginPage />} />
       <Route path="/display" element={<DisplayScreen />} />
       <Route path="/s/:token" element={<SurveyPage />} />
       <Route path="/login" element={<AuthPageLayout><SignInForm /></AuthPageLayout>} />

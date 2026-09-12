@@ -1,4 +1,5 @@
 import { makeAutoObservable } from "mobx";
+import { operadoresStore, SECCIONES } from "@/stores/operadores.store";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -30,6 +31,14 @@ export class SessionStore {
   /** Módulos seleccionados por el usuario (puede ser uno o los dos). */
   modulos: Modulo[] = [];
   rol: Rol | null = null;
+
+  /**
+   * Id del operador que se está simulando (mock). Cuando no es null, la app
+   * corre "como" ese operador: el sidebar y las rutas se limitan a sus
+   * permisos. La simulación se activa desde /seleccionar (rol operador →
+   * "Simular").
+   */
+  operadorSimuladoId: string | null = null;
 
   constructor() {
     makeAutoObservable(this);
@@ -91,6 +100,51 @@ export class SessionStore {
     return this.modulos.length > 0 && this.rol !== null;
   }
 
+  // ── Simulación de operador ────────────────────────────────────────────────
+
+  /** true si la app está corriendo en modo "simular operador". */
+  get isSimulando() {
+    return this.operadorSimuladoId !== null;
+  }
+
+  /** El operador que se está simulando (o null). */
+  get operadorSimulado() {
+    if (!this.operadorSimuladoId) return null;
+    return operadoresStore.operadores.find((o) => o.id === this.operadorSimuladoId) ?? null;
+  }
+
+  /**
+   * Secciones (ids) que el usuario actual puede ver.
+   * - Simulando operador → sus permisos.
+   * - Cualquier otro caso (admin) → null = sin restricción (ve todo).
+   */
+  get permisosActuales(): string[] | null {
+    if (this.isSimulando) return this.operadorSimulado?.permisos ?? [];
+    return null;
+  }
+
+  /** ¿El usuario actual puede ver la sección dada? Admin siempre true. */
+  puedeVer(seccionId: string) {
+    const permisos = this.permisosActuales;
+    if (permisos === null) return true; // admin / sin simulación
+    return permisos.includes(seccionId);
+  }
+
+  /**
+   * Ruta "inicio" a la que volver según el usuario actual:
+   * - Simulando operador → la primera sección que SÍ tiene permitida (para no
+   *   caer en una ruta bloqueada). Si no tiene ninguna, su módulo de entrada.
+   * - Admin / sin simulación → el módulo de entrada normal.
+   */
+  get homePathActual() {
+    const op = this.operadorSimulado;
+    if (op) {
+      const primera = SECCIONES[op.modulo].find((s) => op.permisos.includes(s.id));
+      if (primera) return primera.path;
+    }
+    return this.moduloEntryPath;
+  }
+
   // ── Mutadores ───────────────────────────────────────────────────────────
 
   /** Agrega o quita un módulo de la selección (toggle). */
@@ -117,10 +171,28 @@ export class SessionStore {
     this.rol = rol;
   }
 
+  /**
+   * Entra en modo simulación como el operador dado (mock). Ajusta módulo y rol
+   * a los del operador para que la app se comporte como si él estuviera dentro.
+   */
+  simular(operadorId: string) {
+    const op = operadoresStore.operadores.find((o) => o.id === operadorId);
+    if (!op) return;
+    this.operadorSimuladoId = operadorId;
+    this.rol = "operador";
+    this.modulos = [op.modulo];
+  }
+
+  /** Sale del modo simulación y limpia todo (vuelve al inicio del flujo). */
+  salirSimulacion() {
+    this.reset();
+  }
+
   /** Limpia la sesión (ej. al cerrar sesión). */
   reset() {
     this.modulos = [];
     this.rol = null;
+    this.operadorSimuladoId = null;
   }
 }
 
