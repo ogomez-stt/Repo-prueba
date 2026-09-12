@@ -32,6 +32,11 @@ export interface Operador {
    * los datos de esos profesionales. En Turnos queda vacío (no aplica).
    */
   profesionalIds: string[];
+  /**
+   * Colas que el operador puede manejar (solo Turnos). El admin decide qué
+   * colas ve; debe tener al menos una. En Agendamiento queda vacío (no aplica).
+   */
+  colaIds: string[];
 }
 
 /** Una sección visible del módulo, controlable por permisos. */
@@ -72,15 +77,15 @@ const todasLasSecciones = (modulo: Modulo): string[] => SECCIONES[modulo].map((s
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SEED: Operador[] = [
-  // ── Turnos (operadores genéricos, sin profesional) ──────────────────────────
-  { id: "t1", nombre: "Laura Gómez", email: "laura.gomez@negocio.com", telefono: "+57 300 111 2233", estado: "activo", modulo: "turnos", permisos: todasLasSecciones("turnos"), profesionalIds: [] },
-  { id: "t2", nombre: "Carlos Ruiz", email: "carlos.ruiz@negocio.com", telefono: "+57 301 222 3344", estado: "activo", modulo: "turnos", permisos: ["inicio", "turnos", "colas"], profesionalIds: [] },
-  { id: "t3", nombre: "Andrea Peña", email: "andrea.pena@negocio.com", telefono: "+57 302 333 4455", estado: "pendiente", modulo: "turnos", permisos: ["inicio", "turnos"], profesionalIds: [] },
-  { id: "t4", nombre: "Julián Torres", email: "julian.torres@negocio.com", telefono: "+57 303 444 5566", estado: "inactivo", modulo: "turnos", permisos: ["inicio"], profesionalIds: [] },
+  // ── Turnos (ligados a colas: 1=Consulta general, 2=Laboratorio, 3=Mesa/Pedidos) ──
+  { id: "t1", nombre: "Laura Gómez", email: "laura.gomez@negocio.com", telefono: "+57 300 111 2233", estado: "activo", modulo: "turnos", permisos: todasLasSecciones("turnos"), profesionalIds: [], colaIds: ["1", "2", "3"] },
+  { id: "t2", nombre: "Carlos Ruiz", email: "carlos.ruiz@negocio.com", telefono: "+57 301 222 3344", estado: "activo", modulo: "turnos", permisos: ["inicio", "turnos", "colas"], profesionalIds: [], colaIds: ["1"] },
+  { id: "t3", nombre: "Andrea Peña", email: "andrea.pena@negocio.com", telefono: "+57 302 333 4455", estado: "pendiente", modulo: "turnos", permisos: ["inicio", "turnos"], profesionalIds: [], colaIds: ["2", "3"] },
+  { id: "t4", nombre: "Julián Torres", email: "julian.torres@negocio.com", telefono: "+57 303 444 5566", estado: "inactivo", modulo: "turnos", permisos: ["inicio"], profesionalIds: [], colaIds: ["1"] },
   // ── Agendamiento (ligados a profesionales p1=Ana, p2=Luis, p3=María) ─────────
-  { id: "a1", nombre: "Sofía Márquez", email: "sofia.marquez@negocio.com", telefono: "+57 310 555 6677", estado: "activo", modulo: "agendamiento", permisos: todasLasSecciones("agendamiento"), profesionalIds: ["p1"] },
-  { id: "a2", nombre: "Diego Herrera", email: "diego.herrera@negocio.com", telefono: "+57 311 666 7788", estado: "activo", modulo: "agendamiento", permisos: ["agenda", "calendario", "crear"], profesionalIds: ["p2", "p3"] },
-  { id: "a3", nombre: "Valentina Ríos", email: "valentina.rios@negocio.com", telefono: "+57 312 777 8899", estado: "pendiente", modulo: "agendamiento", permisos: ["agenda", "calendario"], profesionalIds: ["p1", "p2"] },
+  { id: "a1", nombre: "Sofía Márquez", email: "sofia.marquez@negocio.com", telefono: "+57 310 555 6677", estado: "activo", modulo: "agendamiento", permisos: todasLasSecciones("agendamiento"), profesionalIds: ["p1"], colaIds: [] },
+  { id: "a2", nombre: "Diego Herrera", email: "diego.herrera@negocio.com", telefono: "+57 311 666 7788", estado: "activo", modulo: "agendamiento", permisos: ["agenda", "calendario", "crear"], profesionalIds: ["p2", "p3"], colaIds: [] },
+  { id: "a3", nombre: "Valentina Ríos", email: "valentina.rios@negocio.com", telefono: "+57 312 777 8899", estado: "pendiente", modulo: "agendamiento", permisos: ["agenda", "calendario"], profesionalIds: ["p1", "p2"], colaIds: [] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -123,7 +128,7 @@ export class OperadoresStore {
    */
   crear(
     modulo: Modulo,
-    data: { nombre: string; email: string; telefono: string; profesionalIds?: string[] }
+    data: { nombre: string; email: string; telefono: string; profesionalIds?: string[]; colaIds?: string[] }
   ) {
     this.operadores.push({
       id: `${modulo[0]}${Date.now()}`,
@@ -135,6 +140,8 @@ export class OperadoresStore {
       permisos: todasLasSecciones(modulo),
       // Solo Agendamiento liga profesionales; en Turnos queda vacío.
       profesionalIds: modulo === "agendamiento" ? data.profesionalIds ?? [] : [],
+      // Solo Turnos liga colas; en Agendamiento queda vacío.
+      colaIds: modulo === "turnos" ? data.colaIds ?? [] : [],
     });
   }
 
@@ -148,6 +155,12 @@ export class OperadoresStore {
   setProfesionales(id: string, profesionalIds: string[]) {
     const op = this.operadores.find((o) => o.id === id);
     if (op) op.profesionalIds = profesionalIds;
+  }
+
+  /** Actualiza las colas que puede manejar un operador (solo Turnos). */
+  setColas(id: string, colaIds: string[]) {
+    const op = this.operadores.find((o) => o.id === id);
+    if (op) op.colaIds = colaIds;
   }
 
   /** Aprueba una solicitud pendiente → pasa a activo. */

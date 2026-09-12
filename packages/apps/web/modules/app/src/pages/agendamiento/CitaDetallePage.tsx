@@ -6,13 +6,15 @@ import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
-import { agendaStore } from "@/stores";
+import { agendaStore, sessionStore } from "@/stores";
 
 export const CitaDetallePage = observer(() => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const id = params.get("id") ?? "";
-  const cita = agendaStore.getCita(id);
+  const citaRaw = agendaStore.getCita(id);
+  // En simulación de operador, solo puede ver citas de sus profesionales.
+  const cita = citaRaw && sessionStore.puedeVerProfesional(citaRaw.profesionalId) ? citaRaw : undefined;
 
   const [reagOpen, setReagOpen] = useState(false);
   const [nuevaFecha, setNuevaFecha] = useState("");

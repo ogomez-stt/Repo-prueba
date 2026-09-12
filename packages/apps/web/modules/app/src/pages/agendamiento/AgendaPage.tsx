@@ -8,7 +8,7 @@ import { Badge } from "@/elements/ui/badge";
 import { Card } from "@/elements/ui/card";
 import { MetricCard } from "@/compositions/metric-card";
 import { CalenderIcon, TimeIcon, GroupIcon, PlusIcon } from "@/icons";
-import { agendaStore, todayIso, type Cita } from "@/stores";
+import { agendaStore, sessionStore, todayIso, type Cita } from "@/stores";
 import type { CitaEstado } from "@/stores";
 
 const dayLabel = (isoDate: string): string => {
@@ -102,8 +102,14 @@ export const AgendaPage = observer(() => {
   const [searchParams] = useSearchParams();
   const [estadoFilter, setEstadoFilter] = useState<CitaEstado | "all">("all");
 
-  // Profesional actual: del ?prof= o el primero disponible.
-  const profId = searchParams.get("prof") || agendaStore.profesionales[0]?.id || "";
+  // Profesionales visibles (en simulación de operador, solo los suyos).
+  const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
+  // Profesional actual: del ?prof= si es visible, si no el primero visible.
+  const profParam = searchParams.get("prof");
+  const profId =
+    (profParam && sessionStore.puedeVerProfesional(profParam) ? profParam : "") ||
+    profesionalesVisibles[0]?.id ||
+    "";
   const prof = agendaStore.getProfesional(profId);
 
   // Solo citas de ESTE profesional (agenda independiente).
@@ -117,7 +123,7 @@ export const AgendaPage = observer(() => {
 
   const grupos = agendaStore.groupedByDay(filtered);
 
-  const profOptions = agendaStore.profesionales.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
+  const profOptions = profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
   const estadoOptions = [
     { value: "all", label: "Todos los estados" },
     { value: "pendiente", label: "Pendiente" },

@@ -10,7 +10,7 @@ import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Switch } from "@/elements/form/switch";
 import { MultiSelect } from "@/elements/form/multi-select";
-import { operadoresStore, agendaStore, SECCIONES, type Modulo, type Operador, type OperadorEstado } from "@/stores";
+import { operadoresStore, agendaStore, queuesStore, SECCIONES, type Modulo, type Operador, type OperadorEstado } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROFESIONALES (helpers para el vínculo operador ↔ profesional en Agendamiento)
@@ -24,6 +24,20 @@ const opcionesProfesionales = () =>
 const nombresProfesionales = (ids: string[]) =>
   ids
     .map((id) => agendaStore.profesionales.find((p) => p.id === id)?.nombre)
+    .filter((n): n is string => Boolean(n));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COLAS (helpers para el vínculo operador ↔ cola en Turnos)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Opciones de colas para el MultiSelect ({value:id, text:nombre}). */
+const opcionesColas = () =>
+  queuesStore.queues.map((q) => ({ value: q.id, text: q.nombre }));
+
+/** Nombres de las colas dado un array de ids. */
+const nombresColas = (ids: string[]) =>
+  ids
+    .map((id) => queuesStore.queues.find((q) => q.id === id)?.nombre)
     .filter((n): n is string => Boolean(n));
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -66,10 +80,13 @@ interface OperadoresPageProps {
  */
 export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
   const esAgendamiento = modulo === "agendamiento";
+  const esTurnos = modulo === "turnos";
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<OperadorForm>(EMPTY_FORM);
   // Profesionales seleccionados en el modal de crear (solo Agendamiento).
   const [nuevoProfesionales, setNuevoProfesionales] = useState<string[]>([]);
+  // Colas seleccionadas en el modal de crear (solo Turnos).
+  const [nuevoColas, setNuevoColas] = useState<string[]>([]);
   // Contador para re-montar el MultiSelect (uncontrolled) al reabrir el modal.
   const [crearKey, setCrearKey] = useState(0);
   // Operador cuyo perfil se está viendo/editando (null = modal de perfil cerrado).
@@ -85,13 +102,16 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
 
   const datosBasicosOk =
     form.nombre.trim() !== "" && form.email.trim() !== "" && form.telefono.trim() !== "";
-  // En Agendamiento es obligatorio ligar al menos un profesional.
+  // Vínculo obligatorio según el módulo: Agendamiento ≥1 profesional; Turnos ≥1 cola.
   const requeridosCompletos =
-    datosBasicosOk && (!esAgendamiento || nuevoProfesionales.length > 0);
+    datosBasicosOk &&
+    (!esAgendamiento || nuevoProfesionales.length > 0) &&
+    (!esTurnos || nuevoColas.length > 0);
 
   const abrirCrear = () => {
     setForm(EMPTY_FORM);
     setNuevoProfesionales([]);
+    setNuevoColas([]);
     setCrearKey((k) => k + 1);
     setModalOpen(true);
   };
@@ -103,6 +123,7 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
       email: form.email.trim(),
       telefono: form.telefono.trim(),
       profesionalIds: esAgendamiento ? nuevoProfesionales : undefined,
+      colaIds: esTurnos ? nuevoColas : undefined,
     });
     setModalOpen(false);
   };
@@ -145,6 +166,7 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
                 <TableCell header>Correo electrónico</TableCell>
                 <TableCell header>Teléfono</TableCell>
                 {esAgendamiento && <TableCell header>Profesional(es)</TableCell>}
+                {esTurnos && <TableCell header>Colas</TableCell>}
                 <TableCell header>Estado</TableCell>
                 <TableCell header className="text-right">Acciones</TableCell>
               </TableRow>
@@ -155,6 +177,7 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
                   key={op.id}
                   op={op}
                   mostrarProfesionales={esAgendamiento}
+                  mostrarColas={esTurnos}
                   onAbrirPerfil={() => setPerfilId(op.id)}
                 />
               ))}
@@ -188,12 +211,26 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
           {esAgendamiento && (
             <div>
               <MultiSelect
-                key={crearKey}
+                key={`prof-${crearKey}`}
                 label="Profesional(es) a cargo *"
                 options={opcionesProfesionales()}
                 defaultSelected={[]}
                 onChange={setNuevoProfesionales}
                 hint="El operador solo verá los datos de los profesionales que le asignes."
+              />
+            </div>
+          )}
+
+          {/* Vínculo con colas — solo en Turnos, obligatorio */}
+          {esTurnos && (
+            <div>
+              <MultiSelect
+                key={`cola-${crearKey}`}
+                label="Cola(s) que puede manejar *"
+                options={opcionesColas()}
+                defaultSelected={[]}
+                onChange={setNuevoColas}
+                hint="El operador solo verá y atenderá las colas que le asignes."
               />
             </div>
           )}
@@ -236,10 +273,12 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
   const secciones = SECCIONES[modulo];
   const badge = estadoBadge[op.estado];
   const esAgendamiento = modulo === "agendamiento";
+  const esTurnos = modulo === "turnos";
 
   // Estado local editable (borrador): no toca el store hasta Guardar.
   const [permisos, setPermisos] = useState<string[]>([...op.permisos]);
   const [profesionales, setProfesionales] = useState<string[]>([...op.profesionalIds]);
+  const [colas, setColas] = useState<string[]>([...op.colaIds]);
 
   const toggle = (id: string) =>
     setPermisos((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -248,13 +287,16 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
   const toggleTodos = () =>
     setPermisos(todos ? [] : secciones.map((s) => s.id));
 
-  // En Agendamiento el operador debe conservar al menos un profesional.
+  // Vínculo mínimo obligatorio: Agendamiento ≥1 profesional; Turnos ≥1 cola.
   const profesionalesOk = !esAgendamiento || profesionales.length > 0;
+  const colasOk = !esTurnos || colas.length > 0;
+  const vinculoOk = profesionalesOk && colasOk;
 
   const guardar = () => {
-    if (!profesionalesOk) return;
+    if (!vinculoOk) return;
     operadoresStore.setPermisos(op.id, permisos);
     if (esAgendamiento) operadoresStore.setProfesionales(op.id, profesionales);
+    if (esTurnos) operadoresStore.setColas(op.id, colas);
     onClose();
   };
 
@@ -298,6 +340,24 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
         </div>
       )}
 
+      {/* Colas a cargo — solo Turnos */}
+      {esTurnos && (
+        <div className="mb-6">
+          <MultiSelect
+            label="Colas que puede manejar *"
+            options={opcionesColas()}
+            defaultSelected={op.colaIds}
+            onChange={setColas}
+            error={!colasOk}
+            hint={
+              colasOk
+                ? "Este operador solo verá y atenderá estas colas."
+                : "Debe tener al menos una cola asignada."
+            }
+          />
+        </div>
+      )}
+
       {/* Permisos */}
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">¿Qué puede ver en la app?</h3>
@@ -330,7 +390,7 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
       {/* Acciones */}
       <div className="flex items-center justify-end gap-3">
         <Button size="sm" variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button size="sm" disabled={!profesionalesOk} onClick={guardar}>Guardar cambios</Button>
+        <Button size="sm" disabled={!vinculoOk} onClick={guardar}>Guardar cambios</Button>
       </div>
     </Modal>
   );
@@ -345,9 +405,10 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
  * Los botones de acción usan stopPropagation para no disparar el perfil.
  */
 const OperadorRow = observer(
-  ({ op, mostrarProfesionales, onAbrirPerfil }: { op: Operador; mostrarProfesionales: boolean; onAbrirPerfil: () => void }) => {
+  ({ op, mostrarProfesionales, mostrarColas, onAbrirPerfil }: { op: Operador; mostrarProfesionales: boolean; mostrarColas: boolean; onAbrirPerfil: () => void }) => {
   const badge = estadoBadge[op.estado];
   const profesionales = nombresProfesionales(op.profesionalIds);
+  const colas = nombresColas(op.colaIds);
 
   // Clase para las celdas clickeables (todas menos la de acciones).
   const celdaClickeable = "cursor-pointer transition-colors";
@@ -368,6 +429,19 @@ const OperadorRow = observer(
           <div onClick={onAbrirPerfil} className="flex flex-wrap gap-1">
             {profesionales.length > 0 ? (
               profesionales.map((n) => (
+                <Badge key={n} color="info" size="sm">{n}</Badge>
+              ))
+            ) : (
+              <span className="text-sm text-gray-400">—</span>
+            )}
+          </div>
+        </TableCell>
+      )}
+      {mostrarColas && (
+        <TableCell className={celdaClickeable}>
+          <div onClick={onAbrirPerfil} className="flex flex-wrap gap-1">
+            {colas.length > 0 ? (
+              colas.map((n) => (
                 <Badge key={n} color="info" size="sm">{n}</Badge>
               ))
             ) : (

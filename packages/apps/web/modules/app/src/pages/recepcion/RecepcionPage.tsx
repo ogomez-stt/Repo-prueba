@@ -6,7 +6,7 @@ import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Select } from "@/elements/form/select";
 import { Button } from "@/elements/ui/button";
-import { queuesStore, type CustomField } from "@/stores";
+import { queuesStore, sessionStore, type CustomField } from "@/stores";
 
 interface CreatedInfo {
   numero: string;
@@ -25,7 +25,8 @@ export const RecepcionPage = observer(() => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const queues = queuesStore.queues.filter((q) => q.activa);
+  // Solo colas activas y, en simulación de operador, solo sus colas asignadas.
+  const queues = queuesStore.queues.filter((q) => q.activa && sessionStore.puedeVerCola(q.id));
   const initialCola = searchParams.get("cola") || queues[0]?.id || "";
 
   const [colaId, setColaId] = useState<string>(initialCola);

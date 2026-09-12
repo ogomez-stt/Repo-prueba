@@ -6,7 +6,7 @@ import { Alert } from "@/elements/ui/alert";
 import { ButtonsGroup } from "@/elements/ui/buttons-group";
 import { Modal } from "@/elements/ui/modal";
 import { Button } from "@/elements/ui/button";
-import { queuesStore, type AttentionMode, type TicketState } from "@/stores";
+import { queuesStore, sessionStore, type AttentionMode, type TicketState } from "@/stores";
 import { TicketCard, type CardTicket } from "./components/TicketCard";
 
 type ColumnKey = "waiting" | "serving" | "done";
@@ -28,9 +28,12 @@ export const TurnosPage = observer(() => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Resolve current queue: from ?cola= param, else first queue
+  // Colas visibles para el usuario actual (en simulación, solo las del operador).
+  const colasVisibles = queuesStore.queues.filter((q) => sessionStore.puedeVerCola(q.id));
+  // Cola actual: la de ?cola= si es visible, si no la primera visible.
   const colaId = searchParams.get("cola");
-  const queue = (colaId && queuesStore.getQueue(colaId)) || queuesStore.queues[0];
+  const pedida = colaId ? queuesStore.getQueue(colaId) : undefined;
+  const queue = (pedida && sessionStore.puedeVerCola(pedida.id) ? pedida : undefined) || colasVisibles[0];
 
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");

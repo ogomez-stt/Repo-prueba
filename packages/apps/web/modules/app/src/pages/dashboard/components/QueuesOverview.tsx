@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
 import { observer } from "mobx-react-lite";
-import { queuesStore, type Saturation } from "@/stores";
+import { queuesStore, sessionStore, type Saturation } from "@/stores";
 import { cn } from "@/utils";
 
 const satMeta: Record<Saturation, { dot: string; label: string }> = {
@@ -14,7 +14,8 @@ const satMeta: Record<Saturation, { dot: string; label: string }> = {
  */
 export const QueuesOverview = observer(() => {
   const navigate = useNavigate();
-  const queues = queuesStore.queues;
+  // En modo simulación de operador, solo sus colas asignadas.
+  const queues = queuesStore.queues.filter((q) => sessionStore.puedeVerCola(q.id));
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-theme-sm dark:bg-gray-900">

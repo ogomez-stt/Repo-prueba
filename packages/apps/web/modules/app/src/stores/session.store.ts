@@ -131,6 +131,40 @@ export class SessionStore {
   }
 
   /**
+   * Ids de colas visibles para el usuario actual (Turnos):
+   * - Simulando operador → sus colas asignadas.
+   * - Admin / sin simulación → null = sin restricción (ve todas).
+   */
+  get colasVisiblesIds(): string[] | null {
+    if (this.isSimulando) return this.operadorSimulado?.colaIds ?? [];
+    return null;
+  }
+
+  /** ¿Puede el usuario actual ver la cola dada? Admin siempre true. */
+  puedeVerCola(colaId: string) {
+    const ids = this.colasVisiblesIds;
+    if (ids === null) return true;
+    return ids.includes(colaId);
+  }
+
+  /**
+   * Ids de profesionales visibles para el usuario actual (Agendamiento):
+   * - Simulando operador → sus profesionales asignados.
+   * - Admin / sin simulación → null = sin restricción (ve todos).
+   */
+  get profesionalesVisiblesIds(): string[] | null {
+    if (this.isSimulando) return this.operadorSimulado?.profesionalIds ?? [];
+    return null;
+  }
+
+  /** ¿Puede el usuario actual ver al profesional dado? Admin siempre true. */
+  puedeVerProfesional(profesionalId: string) {
+    const ids = this.profesionalesVisiblesIds;
+    if (ids === null) return true;
+    return ids.includes(profesionalId);
+  }
+
+  /**
    * Ruta "inicio" a la que volver según el usuario actual:
    * - Simulando operador → la primera sección que SÍ tiene permitida (para no
    *   caer en una ruta bloqueada). Si no tiene ninguna, su módulo de entrada.

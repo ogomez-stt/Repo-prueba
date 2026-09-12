@@ -8,7 +8,7 @@ import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Select } from "@/elements/form/select";
 import { DatePicker } from "@/elements/form/date-picker";
-import { agendaStore, todayIso, type Modalidad, type Cita } from "@/stores";
+import { agendaStore, sessionStore, todayIso, type Modalidad, type Cita } from "@/stores";
 
 const RequiredMark = () => <span className="text-error-500">*</span>;
 
@@ -30,8 +30,10 @@ export const CrearCitaPage = observer(() => {
 
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
+  // Profesionales visibles (en simulación de operador, solo los suyos).
+  const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
   const [profesionalId, setProfesionalId] = useState(
-    (preProf && agendaStore.getProfesional(preProf) ? preProf : agendaStore.profesionales[0]?.id) ?? "",
+    (preProf && sessionStore.puedeVerProfesional(preProf) ? preProf : profesionalesVisibles[0]?.id) ?? "",
   );
   const [servicio, setServicio] = useState("");
   const [fecha, setFecha] = useState(todayIso());
@@ -41,7 +43,7 @@ export const CrearCitaPage = observer(() => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<Cita | null>(null);
 
-  const profOptions = agendaStore.profesionales.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
+  const profOptions = profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
   const profSel = agendaStore.getProfesional(profesionalId);
 
   const resetForm = () => {

@@ -6,7 +6,7 @@ import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { Select } from "@/elements/form/select";
 import { Notification } from "@/elements/ui/notification";
-import { queuesStore, type Queue, type AttentionMode, type CustomField, type FieldType } from "@/stores";
+import { queuesStore, sessionStore, type Queue, type AttentionMode, type CustomField, type FieldType } from "@/stores";
 import { QueueCard } from "./components/QueueCard";
 
 interface QueueForm {
@@ -38,9 +38,10 @@ export const ColasPage = observer(() => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const queues = queuesStore.queues;
-  const activeCount = queuesStore.activeCount;
-  const totalWaiting = queuesStore.totalWaiting;
+  // En modo simulación de operador, solo sus colas asignadas (admin ve todas).
+  const queues = queuesStore.queues.filter((q) => sessionStore.puedeVerCola(q.id));
+  const activeCount = queues.filter((q) => q.activa).length;
+  const totalWaiting = queues.reduce((s, q) => s + (q.activa ? q.waiting.length : 0), 0);
 
   const subtitle = queues.length === 0
     ? "Aun no tienes colas"

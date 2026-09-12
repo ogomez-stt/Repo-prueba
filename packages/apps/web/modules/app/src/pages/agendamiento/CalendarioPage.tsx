@@ -9,7 +9,7 @@ import { Modal } from "@/elements/ui/modal";
 import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Select } from "@/elements/form/select";
-import { agendaStore, todayIso, type Modalidad } from "@/stores";
+import { agendaStore, sessionStore, todayIso, type Modalidad } from "@/stores";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -39,8 +39,14 @@ export const CalendarioPage = observer(() => {
   const [month, setMonth] = useState(now.getMonth());
   const [selected, setSelected] = useState<string>(todayIso());
 
-  // Profesional actual: del ?prof= o el primero disponible. El calendario es de ese profesional.
-  const profId = searchParams.get("prof") || agendaStore.profesionales[0]?.id || "";
+  // Profesionales visibles (en simulación de operador, solo los suyos).
+  const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
+  // Profesional actual: del ?prof= si es visible, si no el primero visible.
+  const profParam = searchParams.get("prof");
+  const profId =
+    (profParam && sessionStore.puedeVerProfesional(profParam) ? profParam : "") ||
+    profesionalesVisibles[0]?.id ||
+    "";
   const prof = agendaStore.getProfesional(profId);
 
   // Nueva cita (desde un slot libre) — el profesional lo fija el calendario actual
@@ -149,7 +155,7 @@ export const CalendarioPage = observer(() => {
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="sm:w-56">
-            <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)} options={agendaStore.profesionales.map((p) => ({ value: p.id, label: p.nombre }))} />
+            <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)} options={profesionalesVisibles.map((p) => ({ value: p.id, label: p.nombre }))} />
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={goToday}>Hoy</Button>
