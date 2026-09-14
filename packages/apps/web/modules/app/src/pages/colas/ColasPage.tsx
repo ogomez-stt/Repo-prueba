@@ -38,6 +38,9 @@ export const ColasPage = observer(() => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  // Solo el admin puede crear/editar/activar/eliminar colas. El operador solo
+  // ve, gestiona y comparte las suyas.
+  const esAdmin = sessionStore.isAdmin;
   // En modo simulación de operador, solo sus colas asignadas (admin ve todas).
   const queues = queuesStore.queues.filter((q) => sessionStore.puedeVerCola(q.id));
   const activeCount = queues.filter((q) => q.activa).length;
@@ -147,7 +150,8 @@ export const ColasPage = observer(() => {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Colas</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         </div>
-        <Button size="sm" onClick={openCreate}>+ Crear cola</Button>
+        {/* Crear cola: solo admin */}
+        {esAdmin && <Button size="sm" onClick={openCreate}>+ Crear cola</Button>}
       </div>
 
       {/* Grid or empty state */}
@@ -159,12 +163,20 @@ export const ColasPage = observer(() => {
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Aun no tienes colas</h3>
-          <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-            Crea la primera para empezar a recibir turnos por WhatsApp.
-          </p>
-          <button onClick={openCreate} className="mt-5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">
-            Crear cola
-          </button>
+          {esAdmin ? (
+            <>
+              <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+                Crea la primera para empezar a recibir turnos por WhatsApp.
+              </p>
+              <button onClick={openCreate} className="mt-5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">
+                Crear cola
+              </button>
+            </>
+          ) : (
+            <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+              El administrador aún no te ha asignado colas. Pídele acceso para empezar a gestionarlas.
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -173,6 +185,7 @@ export const ColasPage = observer(() => {
               key={q.id}
               queue={q}
               saturation={queuesStore.saturationOf(q)}
+              readOnly={!esAdmin}
               onToggle={(active) => toggleQueue(q.id, active)}
               onManage={() => navigate(`/turnos?cola=${q.id}`)}
               onShare={() => shareQueue(q)}

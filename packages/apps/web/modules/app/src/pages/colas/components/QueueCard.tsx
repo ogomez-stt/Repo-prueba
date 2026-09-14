@@ -12,6 +12,11 @@ interface QueueCardProps {
   onShare: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /**
+   * Modo solo lectura para operadores: oculta las acciones de administración
+   * (editar, eliminar, pausar/reanudar). El operador solo ve, gestiona y comparte.
+   */
+  readOnly?: boolean;
 }
 
 const saturationMeta: Record<Saturation, { dot: string; label: string; text: string }> = {
@@ -23,7 +28,7 @@ const saturationMeta: Record<Saturation, { dot: string; label: string; text: str
 /**
  * QueueCard — Visual overview card for a single queue.
  */
-export const QueueCard = ({ queue, saturation, onToggle, onManage, onShare, onEdit, onDelete }: QueueCardProps) => {
+export const QueueCard = ({ queue, saturation, onToggle, onManage, onShare, onEdit, onDelete, readOnly = false }: QueueCardProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const meta = saturationMeta[saturation];
   const item = "block w-full rounded-md px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5";
@@ -44,24 +49,27 @@ export const QueueCard = ({ queue, saturation, onToggle, onManage, onShare, onEd
           <span className={cn("h-3 w-3 rounded-full", queue.color)} />
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">{queue.nombre}</h3>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="dropdown-toggle flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-              <path d="M12 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4z" />
-            </svg>
-          </button>
-          <ShellDropdown
-            isOpen={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            className="absolute right-0 z-40 mt-1 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-theme-lg dark:border-gray-800 dark:bg-gray-900"
-          >
-            <ShellDropdownItem className={item} onItemClick={() => setMenuOpen(false)} onClick={onEdit}>Editar</ShellDropdownItem>
-            <ShellDropdownItem className={`${item} text-error-500`} onItemClick={() => setMenuOpen(false)} onClick={onDelete}>Eliminar</ShellDropdownItem>
-          </ShellDropdown>
-        </div>
+        {/* Editar/Eliminar: solo admin */}
+        {!readOnly && (
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="dropdown-toggle flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                <path d="M12 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+            <ShellDropdown
+              isOpen={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              className="absolute right-0 z-40 mt-1 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-theme-lg dark:border-gray-800 dark:bg-gray-900"
+            >
+              <ShellDropdownItem className={item} onItemClick={() => setMenuOpen(false)} onClick={onEdit}>Editar</ShellDropdownItem>
+              <ShellDropdownItem className={`${item} text-error-500`} onItemClick={() => setMenuOpen(false)} onClick={onDelete}>Eliminar</ShellDropdownItem>
+            </ShellDropdown>
+          </div>
+        )}
       </div>
 
       {/* Saturation status */}
@@ -94,10 +102,16 @@ export const QueueCard = ({ queue, saturation, onToggle, onManage, onShare, onEd
         </span>
       </div>
 
-      {/* Pause/resume */}
+      {/* Pausar/reanudar: solo admin. El operador solo ve el estado. */}
       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
         <span className="text-sm text-gray-500 dark:text-gray-400">{queue.activa ? "Activa" : "Pausada"}</span>
-        <Switch checked={queue.activa} onChange={onToggle} />
+        {readOnly ? (
+          <span className={cn("text-sm font-medium", queue.activa ? "text-success-600" : "text-gray-400")}>
+            {queue.activa ? "Activa" : "Pausada"}
+          </span>
+        ) : (
+          <Switch checked={queue.activa} onChange={onToggle} />
+        )}
       </div>
 
       {/* Actions */}
