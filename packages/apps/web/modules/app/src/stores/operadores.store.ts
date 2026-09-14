@@ -72,6 +72,39 @@ export const SECCIONES: Record<Modulo, Seccion[]> = {
 /** Todos los ids de sección de un módulo (útil para "seleccionar todo" y seeds). */
 const todasLasSecciones = (modulo: Modulo): string[] => SECCIONES[modulo].map((s) => s.id);
 
+/**
+ * Estadísticas de rendimiento de un operador (mock, sin backend).
+ * Hoy los tickets no registran autor, así que estos números son de ejemplo
+ * para el dashboard del admin. Cuando exista backend, se derivarían de la
+ * actividad real del operador.
+ */
+export interface OperadorStats {
+  /** Turnos que el operador dio de alta. */
+  turnosCreados: number;
+  /** Turnos que el operador pasó a atención / llamó. */
+  turnosAtendidos: number;
+  /** Turnos que completó hoy. */
+  completadosHoy: number;
+  /** Última actividad, texto legible relativo (ej. "hace 5 min"). */
+  ultimaActividad: string;
+}
+
+/** Stats mock por id de operador (solo Turnos por ahora). */
+const STATS_SEED: Record<string, OperadorStats> = {
+  t1: { turnosCreados: 42, turnosAtendidos: 38, completadosHoy: 12, ultimaActividad: "hace 5 min" },
+  t2: { turnosCreados: 18, turnosAtendidos: 25, completadosHoy: 7, ultimaActividad: "hace 22 min" },
+  t3: { turnosCreados: 0, turnosAtendidos: 9, completadosHoy: 3, ultimaActividad: "hace 1 h" },
+  t4: { turnosCreados: 5, turnosAtendidos: 2, completadosHoy: 0, ultimaActividad: "ayer" },
+};
+
+/** Stats por defecto para operadores sin datos en el seed (ej. recién creados). */
+const STATS_VACIAS: OperadorStats = {
+  turnosCreados: 0,
+  turnosAtendidos: 0,
+  completadosHoy: 0,
+  ultimaActividad: "sin actividad",
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MOCK DATA
 // ═══════════════════════════════════════════════════════════════════════════
@@ -117,6 +150,11 @@ export class OperadoresStore {
   /** Cantidad de solicitudes pendientes de aprobar en un módulo. */
   pendientesCount(modulo: Modulo): number {
     return this.operadores.filter((o) => o.modulo === modulo && o.estado === "pendiente").length;
+  }
+
+  /** Estadísticas (mock) de un operador. Devuelve ceros si no tiene datos. */
+  statsDe(id: string): OperadorStats {
+    return STATS_SEED[id] ?? STATS_VACIAS;
   }
 
   // ── Acciones ────────────────────────────────────────────────────────────────

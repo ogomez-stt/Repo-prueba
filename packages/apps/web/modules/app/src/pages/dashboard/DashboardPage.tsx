@@ -16,6 +16,7 @@ import { CurrentTicketCard } from "./components/CurrentTicketCard";
 import { DashboardCharts } from "./components/DashboardCharts";
 import { QueuesOverview } from "./components/QueuesOverview";
 import { ActivityFeed } from "./components/ActivityFeed";
+import { OperariosStats } from "./components/OperariosStats";
 import { ExportReportModal } from "./components/ExportReportModal";
 import { ConfigureDisplayModal } from "./components/ConfigureDisplayModal";
 import { Notification } from "@/elements/ui/notification";
@@ -124,6 +125,11 @@ export const DashboardPage = observer(() => {
       {/* Statistics */}
       <div className="mt-6">
         <DashboardCharts />
+      </div>
+
+      {/* Rendimiento de operarios */}
+      <div className="mt-6">
+        <OperariosStats />
       </div>
 
       {/* Activity feed */}

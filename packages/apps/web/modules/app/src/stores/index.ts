@@ -13,4 +13,4 @@ export { sessionStore, SessionStore } from '@/stores/session.store';
 export type { Modulo, Rol } from '@/stores/session.store';
 
 export { operadoresStore, OperadoresStore, SECCIONES } from '@/stores/operadores.store';
-export type { Operador, OperadorEstado, Seccion } from '@/stores/operadores.store';
+export type { Operador, OperadorEstado, Seccion, OperadorStats } from '@/stores/operadores.store';

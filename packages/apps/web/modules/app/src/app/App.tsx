@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router";
-import { queuesStore } from "@/stores";
+import { observer } from "mobx-react-lite";
+import { queuesStore, sessionStore } from "@/stores";
 import { AppShell } from "@/app/AppShell";
-import { DashboardPage } from "@/pages/dashboard";
+import { DashboardPage, OperadorInicioTurnos } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
 import { RecepcionPage } from "@/pages/recepcion";
@@ -89,6 +90,18 @@ import { AuthPageLayout } from "@/layouts/auth";
  * - `../pages/` - Componentes de página
  * @kgId d91162d0d213
  */
+
+/**
+ * InicioTurnos — decide qué "Inicio" mostrar en /dashboard:
+ * - Operador simulado en Turnos → su inicio personal (OperadorInicioTurnos).
+ * - Cualquier otro caso (admin) → el panel de control completo (DashboardPage).
+ */
+const InicioTurnos = observer(() => {
+  const op = sessionStore.operadorSimulado;
+  if (op && op.modulo === "turnos") return <OperadorInicioTurnos />;
+  return <DashboardPage />;
+});
+
 export default function App() {
   // Load queues from the backend once on startup (falls back to local data).
   useEffect(() => {
@@ -103,7 +116,7 @@ export default function App() {
           ════════════════════════════════════════════════════════════════════ */}
       <Route element={<AppShell />}>
         {/* Turnos — protegidas por SeccionGuard en modo simulación */}
-        <Route path="/dashboard" element={<SeccionGuard seccion="inicio"><DashboardPage /></SeccionGuard>} />
+        <Route path="/dashboard" element={<SeccionGuard seccion="inicio"><InicioTurnos /></SeccionGuard>} />
         <Route path="/turnos" element={<SeccionGuard seccion="turnos"><TurnosPage /></SeccionGuard>} />
         <Route path="/recepcion" element={<SeccionGuard seccion="recepcion"><RecepcionPage /></SeccionGuard>} />
         <Route path="/colas" element={<SeccionGuard seccion="colas"><ColasPage /></SeccionGuard>} />
