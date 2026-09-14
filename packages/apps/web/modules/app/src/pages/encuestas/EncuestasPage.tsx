@@ -14,6 +14,7 @@ import { GroupIcon, ShootingStarIcon, CheckCircleIcon, TimeIcon } from "@/icons"
 import { StarRating } from "./components/StarRating";
 import { CommentCard } from "./components/CommentCard";
 import { SurveyCharts } from "./components/SurveyCharts";
+import { OperariosEncuestas } from "./components/OperariosEncuestas";
 import { cn } from "@/utils";
 
 type RatingFilter = "all" | "positive" | "negative";
@@ -102,12 +103,21 @@ export const EncuestasPage = observer(() => {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Encuestas</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={openConfig}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mr-1.5 h-4 w-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-          </svg>
-          Configurar encuesta
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" onClick={() => window.open("/s/demo", "_blank")}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mr-1.5 h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Previsualizar
+          </Button>
+          <Button size="sm" variant="outline" onClick={openConfig}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mr-1.5 h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+            </svg>
+            Configurar encuesta
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -127,6 +137,11 @@ export const EncuestasPage = observer(() => {
       {/* Charts */}
       <div className="mt-6">
         <SurveyCharts />
+      </div>
+
+      {/* Encuestas compartidas por operarios */}
+      <div className="mt-6">
+        <OperariosEncuestas />
       </div>
 
       {/* Frequent topics */}

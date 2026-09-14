@@ -8,7 +8,7 @@ import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
 import { RecepcionPage } from "@/pages/recepcion";
 import { SurveyPage } from "@/pages/survey";
-import { EncuestasPage } from "@/pages/encuestas";
+import { EncuestasPage, EncuestaCompartir } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { SeleccionarPage } from "@/pages/seleccionar";
@@ -102,6 +102,16 @@ const InicioTurnos = observer(() => {
   return <DashboardPage />;
 });
 
+/**
+ * Encuestas — decide qué vista mostrar en /encuestas:
+ * - Operador simulado → solo el apartado para compartir el link (EncuestaCompartir).
+ * - Admin → la vista completa con estadísticas y configuración (EncuestasPage).
+ */
+const Encuestas = observer(() => {
+  if (sessionStore.isSimulando) return <EncuestaCompartir />;
+  return <EncuestasPage />;
+});
+
 export default function App() {
   // Load queues from the backend once on startup (falls back to local data).
   useEffect(() => {
@@ -120,7 +130,7 @@ export default function App() {
         <Route path="/turnos" element={<SeccionGuard seccion="turnos"><TurnosPage /></SeccionGuard>} />
         <Route path="/recepcion" element={<SeccionGuard seccion="recepcion"><RecepcionPage /></SeccionGuard>} />
         <Route path="/colas" element={<SeccionGuard seccion="colas"><ColasPage /></SeccionGuard>} />
-        <Route path="/encuestas" element={<SeccionGuard seccion="encuestas"><EncuestasPage /></SeccionGuard>} />
+        <Route path="/encuestas" element={<SeccionGuard seccion="encuestas"><Encuestas /></SeccionGuard>} />
         {/* Agendamiento — protegidas por SeccionGuard en modo simulación */}
         <Route path="/agendamiento" element={<SeccionGuard seccion="agenda"><AgendaPage /></SeccionGuard>} />
         <Route path="/agendamiento/profesionales" element={<SeccionGuard seccion="profesionales"><ProfesionalesPage /></SeccionGuard>} />

@@ -1,4 +1,5 @@
 import { Outlet } from "react-router";
+import { observer } from "mobx-react-lite";
 import { 
   BaseAppShell, 
   BaseAppHeader, 
@@ -7,6 +8,7 @@ import {
 import { ThemeToggleButton } from "@/shell";
 import { AppSidebar } from "@/app/AppSidebar";
 import { AppFooter } from "@/shell/footer";
+import { sessionStore } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HEADER ICONS
@@ -28,11 +30,41 @@ const UserIconOutline = () => (
 // APP HEADER
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AppHeader = () => (
+/**
+ * Chip de identidad del operador simulado. Se muestra en el header en TODAS
+ * las vistas mientras se simula un operador, para dejar claro "quién soy".
+ */
+const OperadorChip = observer(() => {
+  const op = sessionStore.operadorSimulado;
+  if (!op) return null;
+
+  const iniciales = op.nombre
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 py-1 pl-1 pr-3 dark:border-brand-500/30 dark:bg-brand-500/10">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+        {iniciales}
+      </span>
+      <div className="hidden leading-tight sm:block">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-brand-500 dark:text-brand-400">Operando como</p>
+        <p className="text-xs font-semibold text-gray-800 dark:text-white/90">{op.nombre}</p>
+      </div>
+    </div>
+  );
+});
+
+const AppHeader = observer(() => (
   <BaseAppHeader
     leftContent={
       <div className="flex items-center gap-4">
         <ToggleAppSidebar />
+        <OperadorChip />
       </div>
     }
   >
@@ -46,7 +78,7 @@ const AppHeader = () => (
       <ThemeToggleButton />
     </div>
   </BaseAppHeader>
-);
+));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APP SHELL - Clean layout wrapper for new applications

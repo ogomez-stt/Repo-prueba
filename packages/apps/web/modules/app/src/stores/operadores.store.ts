@@ -105,6 +105,34 @@ const STATS_VACIAS: OperadorStats = {
   ultimaActividad: "sin actividad",
 };
 
+/**
+ * Estadísticas de encuestas COMPARTIDAS MANUALMENTE por un operador (mock).
+ * Solo cuentan las que el operador comparte a mano desde su vista; las
+ * encuestas automáticas que el sistema envía al cerrar turno NO suman aquí.
+ */
+export interface EncuestaStats {
+  /** Encuestas que el operador compartió manualmente. */
+  compartidas: number;
+  /** Respuestas recibidas de las encuestas que compartió. */
+  respuestas: number;
+  /** Calificación promedio (1–5) de esas respuestas. 0 si no hay respuestas. */
+  calificacionProm: number;
+}
+
+/** Stats de encuestas mock por id de operador (solo Turnos por ahora). */
+const ENCUESTA_STATS_SEED: Record<string, EncuestaStats> = {
+  t1: { compartidas: 34, respuestas: 21, calificacionProm: 4.6 },
+  t2: { compartidas: 12, respuestas: 5, calificacionProm: 4.1 },
+  t3: { compartidas: 8, respuestas: 3, calificacionProm: 3.7 },
+  t4: { compartidas: 0, respuestas: 0, calificacionProm: 0 },
+};
+
+const ENCUESTA_STATS_VACIAS: EncuestaStats = {
+  compartidas: 0,
+  respuestas: 0,
+  calificacionProm: 0,
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MOCK DATA
 // ═══════════════════════════════════════════════════════════════════════════
@@ -155,6 +183,11 @@ export class OperadoresStore {
   /** Estadísticas (mock) de un operador. Devuelve ceros si no tiene datos. */
   statsDe(id: string): OperadorStats {
     return STATS_SEED[id] ?? STATS_VACIAS;
+  }
+
+  /** Estadísticas de encuestas compartidas (mock) de un operador. */
+  encuestaStatsDe(id: string): EncuestaStats {
+    return ENCUESTA_STATS_SEED[id] ?? ENCUESTA_STATS_VACIAS;
   }
 
   // ── Acciones ────────────────────────────────────────────────────────────────
