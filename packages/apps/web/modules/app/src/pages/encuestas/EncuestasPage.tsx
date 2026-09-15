@@ -48,6 +48,13 @@ export const EncuestasPage = observer(() => {
   };
   const cfgField = (k: keyof SurveyConfig, v: string) => setCfgForm((f) => ({ ...f, [k]: v }));
 
+  // Previsualizar: guarda la config actual del formulario y abre la encuesta
+  // real en una pestaña nueva, para que refleje los últimos cambios.
+  const previsualizar = () => {
+    queuesStore.updateSurveyConfig(cfgForm);
+    window.open("/s/demo", "_blank");
+  };
+
   // Sube el logo desde el dispositivo: lo lee como data URL (base64) y lo guarda
   // en logoUrl. Mock sin backend — la imagen vive en memoria/estado.
   const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +122,7 @@ export const EncuestasPage = observer(() => {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button size="sm" variant="outline" onClick={() => window.open("/s/demo", "_blank")}>
+          <Button size="sm" variant="outline" onClick={previsualizar}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mr-1.5 h-4 w-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -239,14 +246,14 @@ export const EncuestasPage = observer(() => {
       </div>
 
       {/* Configurar la vista pública de encuesta */}
-      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[860px] p-6">
+      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[1040px] p-6 sm:p-8">
         <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Configurar encuesta</h4>
         <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
           Personaliza la pantalla que ve el cliente al abrir el link de calificación.
         </p>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* ── Columna izquierda: formulario ── */}
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-2">
           <div>
             <Label htmlFor="cfg-name">Nombre del negocio</Label>
             <Input id="cfg-name" value={cfgForm.businessName} onChange={(e) => cfgField("businessName", e.target.value)} placeholder="Ej: Mis Carnes Parrilla" />
@@ -285,6 +292,31 @@ export const EncuestasPage = observer(() => {
             <Label htmlFor="cfg-subtitle">Texto de apoyo</Label>
             <Input id="cfg-subtitle" value={cfgForm.subtitle} onChange={(e) => cfgField("subtitle", e.target.value)} placeholder="Tómate un momento para calificar tu visita." />
           </div>
+
+          {/* Textos de los campos de la encuesta */}
+          <div>
+            <Label htmlFor="cfg-satis">Pregunta de satisfacción</Label>
+            <Input id="cfg-satis" value={cfgForm.satisfactionLabel} onChange={(e) => cfgField("satisfactionLabel", e.target.value)} placeholder="Tu satisfacción general" />
+          </div>
+          <div>
+            <Label htmlFor="cfg-recom">Pregunta de recomendación</Label>
+            <Input id="cfg-recom" value={cfgForm.recommendationLabel} onChange={(e) => cfgField("recommendationLabel", e.target.value)} placeholder="¿Qué tan probable es que nos recomiendes?" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="cfg-comlbl">Etiqueta de comentarios</Label>
+              <Input id="cfg-comlbl" value={cfgForm.commentsLabel} onChange={(e) => cfgField("commentsLabel", e.target.value)} placeholder="Comentarios" />
+            </div>
+            <div>
+              <Label htmlFor="cfg-comph">Placeholder de comentarios</Label>
+              <Input id="cfg-comph" value={cfgForm.commentsPlaceholder} onChange={(e) => cfgField("commentsPlaceholder", e.target.value)} placeholder="Cuéntanos qué te pareció..." />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="cfg-submit">Texto del botón de envío</Label>
+            <Input id="cfg-submit" value={cfgForm.submitLabel} onChange={(e) => cfgField("submitLabel", e.target.value)} placeholder="Enviar calificación" />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="cfg-tytitle">Título de agradecimiento</Label>
@@ -346,12 +378,25 @@ const SurveyPreview = ({ cfg }: { cfg: SurveyConfig }) => (
         {cfg.subtitle || "Tómate un momento para calificar tu visita."}
       </p>
 
-      {/* Estrellas de muestra */}
-      <div className="mt-4 flex justify-center">
-        <StarRating value={0} size="lg" />
+      {/* Satisfacción */}
+      <p className="mt-4 text-xs font-medium text-gray-700 dark:text-gray-300">{cfg.satisfactionLabel}</p>
+      <div className="mt-1 flex justify-center">
+        <StarRating value={0} size="md" />
       </div>
 
-      <div className="mt-4 rounded-lg bg-brand-500 py-2 text-sm font-semibold text-white">Enviar</div>
+      {/* Recomendación */}
+      <p className="mt-3 text-xs font-medium text-gray-700 dark:text-gray-300">{cfg.recommendationLabel}</p>
+      <div className="mt-1 flex justify-center">
+        <StarRating value={0} size="md" />
+      </div>
+
+      {/* Comentarios */}
+      <p className="mt-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300">{cfg.commentsLabel}</p>
+      <div className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-left text-xs text-gray-400 dark:border-gray-700">
+        {cfg.commentsPlaceholder}
+      </div>
+
+      <div className="mt-4 rounded-lg bg-brand-500 py-2 text-sm font-semibold text-white">{cfg.submitLabel || "Enviar"}</div>
     </div>
     <p className="mt-3 text-center text-xs text-gray-400">Así verá el cliente el link de la encuesta.</p>
   </div>

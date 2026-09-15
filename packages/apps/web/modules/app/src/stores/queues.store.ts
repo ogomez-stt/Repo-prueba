@@ -58,11 +58,58 @@ export interface Survey {
 /** Branding/copy for the public survey view (the link the client opens). */
 export interface SurveyConfig {
   businessName: string;
-  logoUrl: string;        // optional; empty = show a default star mark
-  title: string;          // e.g. "¿Cómo estuvo tu experiencia?"
-  subtitle: string;       // supporting line under the title
-  thankYouTitle: string;  // success state heading
+  logoUrl: string;         // optional; empty = show a default star mark
+  title: string;           // e.g. "¿Cómo estuvo tu experiencia?"
+  subtitle: string;        // supporting line under the title
+  /** Label de la pregunta de satisfacción (obligatoria). */
+  satisfactionLabel: string;
+  /** Label de la pregunta de recomendación (opcional). */
+  recommendationLabel: string;
+  /** Label del campo de comentarios. */
+  commentsLabel: string;
+  /** Placeholder del campo de comentarios. */
+  commentsPlaceholder: string;
+  /** Texto del botón de envío. */
+  submitLabel: string;
+  thankYouTitle: string;   // success state heading
   thankYouMessage: string;
+}
+
+/** Config por defecto de la encuesta pública. */
+const DEFAULT_SURVEY_CONFIG: SurveyConfig = {
+  businessName: "Mi Negocio",
+  logoUrl: "",
+  title: "¿Cómo estuvo tu experiencia?",
+  subtitle: "Tómate un momento para calificar tu visita.",
+  satisfactionLabel: "Tu satisfacción general",
+  recommendationLabel: "¿Qué tan probable es que nos recomiendes?",
+  commentsLabel: "Comentarios",
+  commentsPlaceholder: "Cuéntanos qué te pareció...",
+  submitLabel: "Enviar calificación",
+  thankYouTitle: "¡Gracias por tu opinión!",
+  thankYouMessage: "Tu respuesta nos ayuda a mejorar el servicio para ti y para todos.",
+};
+
+const SURVEY_CONFIG_KEY = "necto.surveyConfig";
+
+/** Carga la config guardada (merge con defaults) desde localStorage. */
+function loadSurveyConfig(): SurveyConfig {
+  try {
+    const raw = localStorage.getItem(SURVEY_CONFIG_KEY);
+    if (raw) return { ...DEFAULT_SURVEY_CONFIG, ...JSON.parse(raw) };
+  } catch {
+    // Entorno sin localStorage o JSON inválido: usa defaults.
+  }
+  return { ...DEFAULT_SURVEY_CONFIG };
+}
+
+/** Persiste la config en localStorage (para que la encuesta pública la lea). */
+function persistSurveyConfig(cfg: SurveyConfig): void {
+  try {
+    localStorage.setItem(SURVEY_CONFIG_KEY, JSON.stringify(cfg));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
 }
 
 const URGENT_THRESHOLD = 10; // minutes
@@ -358,18 +405,16 @@ class QueuesStore {
 
   surveys: Survey[] = seedSurveys();
 
-  /** Config for the public survey view (editable from the Encuestas dashboard). */
-  surveyConfig: SurveyConfig = {
-    businessName: "Mi Negocio",
-    logoUrl: "",
-    title: "¿Cómo estuvo tu experiencia?",
-    subtitle: "Tómate un momento para calificar tu visita.",
-    thankYouTitle: "¡Gracias por tu opinión!",
-    thankYouMessage: "Tu respuesta nos ayuda a mejorar el servicio para ti y para todos.",
-  };
+  /**
+   * Config for the public survey view (editable from the Encuestas dashboard).
+   * Se persiste en localStorage para que la encuesta pública (/s/:token, que se
+   * abre en otra pestaña con recarga completa) refleje los últimos cambios.
+   */
+  surveyConfig: SurveyConfig = loadSurveyConfig();
 
   updateSurveyConfig(data: Partial<SurveyConfig>): void {
     this.surveyConfig = { ...this.surveyConfig, ...data };
+    persistSurveyConfig(this.surveyConfig);
   }
 
   sentimentOf(rating: number): Sentiment {

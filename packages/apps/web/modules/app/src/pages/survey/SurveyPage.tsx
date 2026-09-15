@@ -119,7 +119,7 @@ export const SurveyPage = observer(() => {
               {/* Satisfacción (obligatoria) */}
               <div>
                 <p className="mb-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tu satisfacción general
+                  {cfg.satisfactionLabel}
                 </p>
                 <StarRating
                   value={satisfaction}
@@ -137,7 +137,7 @@ export const SurveyPage = observer(() => {
               {/* Recomendación (opcional) */}
               <div>
                 <p className="mb-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                  ¿Qué tan probable es que nos recomiendes?
+                  {cfg.recommendationLabel}
                 </p>
                 <StarRating value={recommendation} onChange={setRecommendation} />
               </div>
@@ -145,20 +145,20 @@ export const SurveyPage = observer(() => {
               {/* Comentarios (opcional) */}
               <div>
                 <label htmlFor="comments" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Comentarios <span className="font-normal text-gray-400">(opcional)</span>
+                  {cfg.commentsLabel} <span className="font-normal text-gray-400">(opcional)</span>
                 </label>
                 <textarea
                   id="comments"
                   rows={3}
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
-                  placeholder="Cuéntanos qué te pareció..."
+                  placeholder={cfg.commentsPlaceholder}
                   className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
                 />
               </div>
 
               <Button className="w-full" size="md" onClick={handleSubmit}>
-                Enviar calificación
+                {cfg.submitLabel}
               </Button>
             </div>
           </>
