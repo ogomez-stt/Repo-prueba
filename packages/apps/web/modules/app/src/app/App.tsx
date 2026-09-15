@@ -12,6 +12,7 @@ import { EncuestasPage, EncuestaCompartir } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { SeleccionarPage } from "@/pages/seleccionar";
+import { SimuladorWhatsApp } from "@/pages/simulador";
 import { OperadorRegistroPage, OperadorLoginPage } from "@/pages/operador";
 import { OperadoresTurnosPage, OperadoresAgendamientoPage } from "@/pages/operadores";
 import { SeccionGuard } from "@/app/SeccionGuard";
@@ -153,6 +154,7 @@ export default function App() {
       <Route path="/seleccionar" element={<SeleccionarPage />} />
       <Route path="/operador/registro" element={<OperadorRegistroPage />} />
       <Route path="/operador/login" element={<OperadorLoginPage />} />
+      <Route path="/wa" element={<SimuladorWhatsApp />} />
       <Route path="/display" element={<DisplayScreen />} />
       <Route path="/s/:token" element={<SurveyPage />} />
       <Route path="/login" element={<AuthPageLayout><SignInForm /></AuthPageLayout>} />

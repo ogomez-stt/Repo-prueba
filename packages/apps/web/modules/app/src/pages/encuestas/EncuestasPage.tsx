@@ -48,6 +48,17 @@ export const EncuestasPage = observer(() => {
   };
   const cfgField = (k: keyof SurveyConfig, v: string) => setCfgForm((f) => ({ ...f, [k]: v }));
 
+  // Sube el logo desde el dispositivo: lo lee como data URL (base64) y lo guarda
+  // en logoUrl. Mock sin backend — la imagen vive en memoria/estado.
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => cfgField("logoUrl", String(reader.result));
+    reader.readAsDataURL(file);
+    e.target.value = ""; // permite re-subir el mismo archivo
+  };
+
   const avg = queuesStore.avgRating;
   const total = queuesStore.totalResponses;
   const rate = queuesStore.responseRate;
@@ -228,20 +239,43 @@ export const EncuestasPage = observer(() => {
       </div>
 
       {/* Configurar la vista pública de encuesta */}
-      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[520px] p-6">
+      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[860px] p-6">
         <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Configurar encuesta</h4>
         <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
           Personaliza la pantalla que ve el cliente al abrir el link de calificación.
         </p>
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* ── Columna izquierda: formulario ── */}
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
           <div>
             <Label htmlFor="cfg-name">Nombre del negocio</Label>
             <Input id="cfg-name" value={cfgForm.businessName} onChange={(e) => cfgField("businessName", e.target.value)} placeholder="Ej: Mis Carnes Parrilla" />
           </div>
           <div>
-            <Label htmlFor="cfg-logo">URL del logo <span className="font-normal text-gray-400">(opcional)</span></Label>
-            <Input id="cfg-logo" value={cfgForm.logoUrl} onChange={(e) => cfgField("logoUrl", e.target.value)} placeholder="https://.../logo.png" />
-            <p className="mt-1.5 text-xs text-gray-400">Si lo dejas vacío se muestra un ícono por defecto.</p>
+            <Label>Logo <span className="font-normal text-gray-400">(opcional)</span></Label>
+            <div className="flex items-center gap-3">
+              {cfgForm.logoUrl ? (
+                <img src={cfgForm.logoUrl} alt="Logo" className="h-14 w-14 shrink-0 rounded-lg border border-gray-200 object-contain dark:border-gray-700" />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-300 text-gray-300 dark:border-gray-700">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="h-6 w-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M6 6h.008v.008H6V6z" />
+                  </svg>
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="inline-flex w-fit cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                  Subir imagen
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoFile} />
+                </label>
+                {cfgForm.logoUrl && (
+                  <button type="button" onClick={() => cfgField("logoUrl", "")} className="w-fit text-xs text-error-500 hover:text-error-600">
+                    Quitar logo
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">Sube el logo desde tu dispositivo. Si lo dejas vacío se muestra un ícono por defecto.</p>
           </div>
           <div>
             <Label htmlFor="cfg-title">Título</Label>
@@ -262,6 +296,14 @@ export const EncuestasPage = observer(() => {
             </div>
           </div>
         </div>
+
+        {/* ── Columna derecha: previsualización en vivo del card ── */}
+        <div>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-400">Previsualización</p>
+          <SurveyPreview cfg={cfgForm} />
+        </div>
+        </div>
+
         <div className="mt-6 flex justify-end gap-3">
           <Button size="sm" variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
           <Button size="sm" onClick={saveConfig}>Guardar</Button>
@@ -270,5 +312,49 @@ export const EncuestasPage = observer(() => {
     </>
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PREVIEW — mini-card de cómo se verá la encuesta del cliente
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * SurveyPreview — previsualización en vivo del card que verá el cliente,
+ * usando los valores actuales del formulario de configuración.
+ */
+const SurveyPreview = ({ cfg }: { cfg: SurveyConfig }) => (
+  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+    {/* Simula la pantalla que abre el cliente */}
+    <div className="mx-auto max-w-xs rounded-2xl bg-white p-6 text-center shadow-theme-sm dark:bg-gray-900">
+      {/* Logo o ícono por defecto */}
+      {cfg.logoUrl ? (
+        <img src={cfg.logoUrl} alt="Logo" className="mx-auto mb-4 h-16 w-16 rounded-xl object-contain" />
+      ) : (
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-500/15">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8">
+            <path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8l-5.8 3.1 1.1-6.5L2.6 9.8l6.5-.9L12 2.5z" />
+          </svg>
+        </div>
+      )}
+
+      {cfg.businessName && (
+        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-brand-500">{cfg.businessName}</p>
+      )}
+      <h5 className="text-base font-bold text-gray-800 dark:text-white/90">
+        {cfg.title || "¿Cómo estuvo tu experiencia?"}
+      </h5>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {cfg.subtitle || "Tómate un momento para calificar tu visita."}
+      </p>
+
+      {/* Estrellas de muestra */}
+      <div className="mt-4 flex justify-center">
+        <StarRating value={0} size="lg" />
+      </div>
+
+      <div className="mt-4 rounded-lg bg-brand-500 py-2 text-sm font-semibold text-white">Enviar</div>
+    </div>
+    <p className="mt-3 text-center text-xs text-gray-400">Así verá el cliente el link de la encuesta.</p>
+  </div>
+);
 
 export default EncuestasPage;
