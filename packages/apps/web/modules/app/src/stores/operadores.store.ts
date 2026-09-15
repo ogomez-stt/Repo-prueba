@@ -61,6 +61,7 @@ export const SECCIONES: Record<Modulo, Seccion[]> = {
     { id: "encuestas", label: "Encuestas", path: "/encuestas" },
   ],
   agendamiento: [
+    { id: "inicio", label: "Inicio", path: "/agendamiento/inicio" },
     { id: "profesionales", label: "Profesionales", path: "/agendamiento/profesionales" },
     { id: "agenda", label: "Agenda", path: "/agendamiento" },
     { id: "calendario", label: "Calendario", path: "/agendamiento/calendario" },

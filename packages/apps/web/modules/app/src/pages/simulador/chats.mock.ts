@@ -38,7 +38,7 @@ export interface Chat {
 }
 
 /**
- * 3 conversaciones guionadas COMPLETAS de Turnos en una clínica (mock).
+ * 4 conversaciones guionadas COMPLETAS de Turnos en una clínica (mock).
  */
 export const CHATS: Chat[] = [
   // ── 1. Paciente que crea el turno desde su celular (self-service) ───────────
@@ -121,6 +121,30 @@ export const CHATS: Chat[] = [
       { autor: "bot", texto: "🔔 Laura, tu turno *L-020* (Laboratorio) está próximo. Acércate a la ventanilla 2.", hora: "11:16" },
       { autor: "bot", texto: "🔔 Ahora tu turno *A-044* (Consulta general) está próximo. Pasa a la sala de espera del Consultorio 1.", hora: "11:45" },
       { autor: "bot", texto: "¡Gracias por tu visita, Laura! 💚 Cuéntanos cómo estuvo tu experiencia hoy:", hora: "12:20", link: { label: "Responder encuesta", to: "/s/demo" } },
+    ],
+  },
+
+  // ── 4. Paciente que ya tiene turno y pregunta "¿cómo va mi turno?" ──────────
+  {
+    id: "c4",
+    nombre: "Diego Ramírez",
+    telefono: "+57 304 555 6677",
+    escenario: "Consultó cómo va su turno",
+    mensajes: [
+      { autor: "cliente", texto: "Hola, ya saqué un turno hace rato. ¿Cómo va?", hora: "09:32" },
+      { autor: "bot", texto: "¡Hola! 👋 Con gusto reviso el estado de tu turno.\n\n¿Me confirmas tu número de documento o el código de tu turno (ej. A-045)?", hora: "09:32" },
+      { autor: "cliente", texto: "A-045", hora: "09:33" },
+      { autor: "bot", texto: "Un momento, consulto la fila… ⏳", hora: "09:33" },
+      { autor: "bot", texto: "📋 Estado de tu turno *A-045* — Consulta general:\n\n• Estado: *En espera*\n• Posición: hay *2 personas* antes que tú\n• Atendiendo ahora: A-043\n• Tiempo estimado: ~10 min\n\nTe avisaré cuando estés próximo. 🔔", hora: "09:33" },
+      { autor: "cliente", texto: "Perfecto, ¿me da tiempo de ir por un café aquí al lado?", hora: "09:34" },
+      { autor: "bot", texto: "Sí, con ~10 min de espera alcanzas 🙂 pero no te alejes mucho: si no respondes al llamado, tu turno puede pasar al final de la fila.", hora: "09:34" },
+      { autor: "cliente", texto: "Listo, ya vuelvo. Gracias", hora: "09:34" },
+      { autor: "bot", texto: "🔔 Diego, actualización de tu turno *A-045*: ahora hay *1 persona* antes que tú (~5 min). Ve acercándote a la sala de Consulta general.", hora: "09:40" },
+      { autor: "cliente", texto: "Ya estoy aquí", hora: "09:41" },
+      { autor: "bot", texto: "¡Perfecto! 🙌", hora: "09:41" },
+      { autor: "bot", texto: "🔔 Es tu turno, Diego. Pasa al *Consultorio 1* de Consulta general.", hora: "09:46" },
+      { autor: "cliente", texto: "Gracias!", hora: "09:46" },
+      { autor: "bot", texto: "Que tengas una excelente consulta 💚 Al terminar, ¿nos ayudas con una encuesta rápida?", hora: "10:08", link: { label: "Responder encuesta", to: "/s/demo" } },
     ],
   },
 ];

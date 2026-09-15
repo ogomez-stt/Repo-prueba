@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router";
 import { observer } from "mobx-react-lite";
 import { queuesStore, sessionStore } from "@/stores";
 import { AppShell } from "@/app/AppShell";
-import { DashboardPage, OperadorInicioTurnos } from "@/pages/dashboard";
+import { DashboardPage, DashboardAgendamientoPage, OperadorInicioTurnos } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
 import { RecepcionPage } from "@/pages/recepcion";
@@ -133,6 +133,7 @@ export default function App() {
         <Route path="/colas" element={<SeccionGuard seccion="colas"><ColasPage /></SeccionGuard>} />
         <Route path="/encuestas" element={<SeccionGuard seccion="encuestas"><Encuestas /></SeccionGuard>} />
         {/* Agendamiento — protegidas por SeccionGuard en modo simulación */}
+        <Route path="/agendamiento/inicio" element={<SeccionGuard seccion="inicio"><DashboardAgendamientoPage /></SeccionGuard>} />
         <Route path="/agendamiento" element={<SeccionGuard seccion="agenda"><AgendaPage /></SeccionGuard>} />
         <Route path="/agendamiento/profesionales" element={<SeccionGuard seccion="profesionales"><ProfesionalesPage /></SeccionGuard>} />
         <Route path="/agendamiento/calendario" element={<SeccionGuard seccion="calendario"><CalendarioPage /></SeccionGuard>} />

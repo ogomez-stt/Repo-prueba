@@ -146,7 +146,8 @@ export class SessionStore {
    */
   get moduloEntryPath() {
     if (this.moduloPrincipal === null) return "/seleccionar";
-    return "/dashboard";
+    // El Inicio de cada módulo vive en una ruta distinta.
+    return this.moduloPrincipal === "agendamiento" ? "/agendamiento/inicio" : "/dashboard";
   }
 
   // ── Estado del flujo ────────────────────────────────────────────────────
@@ -229,9 +230,11 @@ export class SessionStore {
   get homePathActual() {
     const op = this.operadorSimulado;
     if (op) {
-      // Preferimos Inicio (/dashboard) si lo tiene permitido; si no, su
-      // primera sección permitida (para no caer en una ruta bloqueada).
-      if (op.permisos.includes("inicio")) return "/dashboard";
+      // Preferimos Inicio si lo tiene permitido; si no, su primera sección
+      // permitida (para no caer en una ruta bloqueada). El path de "inicio"
+      // depende del módulo: Turnos usa /dashboard, Agendamiento /agendamiento/inicio.
+      const inicio = SECCIONES[op.modulo].find((s) => s.id === "inicio");
+      if (inicio && op.permisos.includes("inicio")) return inicio.path;
       const primera = SECCIONES[op.modulo].find((s) => op.permisos.includes(s.id));
       if (primera) return primera.path;
     }

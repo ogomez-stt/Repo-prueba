@@ -202,6 +202,7 @@ const SidebarContent = observer(() => {
           <div>
             <MenuSectionHeader title="Agendamiento" />
             <ul className="flex flex-col gap-1">
+              {puede("inicio") && <MenuItem icon={<GridIcon />} name="Inicio" path="/agendamiento/inicio" isActive={isActive} />}
               {puede("profesionales") && <MenuItem icon={<GroupIcon />} name="Profesionales" path="/agendamiento/profesionales" isActive={isActive} />}
               {puede("agenda") && <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />}
               {puede("calendario") && <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />}

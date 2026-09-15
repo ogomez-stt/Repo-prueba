@@ -564,6 +564,30 @@ class AgendaStore {
     return this.citas.filter((c) => c.profesionalId === profId && c.estado === "pendiente").length;
   }
 
+  /**
+   * Aggregated scheduling metrics for a SET of professionals (the ones assigned
+   * to an operator). Used by the admin dashboard to measure how each operator
+   * manages the appointments of their professionals. Derived from real mock
+   * data (not a stats seed): counts non-cancelled citas of those professionals.
+   */
+  statsDeProfesionales(profIds: string[]): {
+    gestionadas: number;
+    confirmadas: number;
+    noShows: number;
+    completadasHoy: number;
+  } {
+    const set = new Set(profIds);
+    const t = todayIso();
+    const suyas = this.citas.filter((c) => set.has(c.profesionalId));
+    return {
+      // Citas gestionadas = todas menos las canceladas.
+      gestionadas: suyas.filter((c) => c.estado !== "cancelada").length,
+      confirmadas: suyas.filter((c) => c.estado === "confirmada").length,
+      noShows: suyas.filter((c) => c.estado === "noshow").length,
+      completadasHoy: suyas.filter((c) => c.estado === "completada" && c.fecha === t).length,
+    };
+  }
+
   // ── Display helpers ──
   estadoLabel(e: CitaEstado): string {
     return { pendiente: "Pendiente", confirmada: "Confirmada", completada: "Completada", cancelada: "Cancelada", noshow: "No asistió" }[e];
