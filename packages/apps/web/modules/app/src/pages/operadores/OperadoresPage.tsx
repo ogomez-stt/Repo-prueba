@@ -166,7 +166,7 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
                 <TableCell header>Correo electrónico</TableCell>
                 <TableCell header>Teléfono</TableCell>
                 {esAgendamiento && <TableCell header>Profesional(es)</TableCell>}
-                {esTurnos && <TableCell header>Colas</TableCell>}
+                {esTurnos && <TableCell header>Filas</TableCell>}
                 <TableCell header>Estado</TableCell>
                 <TableCell header className="text-right">Acciones</TableCell>
               </TableRow>
@@ -226,11 +226,11 @@ export const OperadoresPage = observer(({ modulo }: OperadoresPageProps) => {
             <div>
               <MultiSelect
                 key={`cola-${crearKey}`}
-                label="Cola(s) que puede manejar *"
+                label="Fila(s) que puede manejar *"
                 options={opcionesColas()}
                 defaultSelected={[]}
                 onChange={setNuevoColas}
-                hint="El operador solo verá y atenderá las colas que le asignes."
+                hint="El operador solo verá y atenderá las filas que le asignes."
               />
             </div>
           )}
@@ -344,15 +344,15 @@ const PerfilModal = ({ op, modulo, onClose }: PerfilModalProps) => {
       {esTurnos && (
         <div className="mb-6">
           <MultiSelect
-            label="Colas que puede manejar *"
+            label="Filas que puede manejar *"
             options={opcionesColas()}
             defaultSelected={op.colaIds}
             onChange={setColas}
             error={!colasOk}
             hint={
               colasOk
-                ? "Este operador solo verá y atenderá estas colas."
-                : "Debe tener al menos una cola asignada."
+                ? "Este operador solo verá y atenderá estas filas."
+                : "Debe tener al menos una fila asignada."
             }
           />
         </div>

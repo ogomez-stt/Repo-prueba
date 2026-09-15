@@ -101,7 +101,7 @@ export const CHATS: Chat[] = [
     id: "c3",
     nombre: "Laura Torres",
     telefono: "+57 302 333 4455",
-    escenario: "Creó turno en varias colas",
+    escenario: "Creó turno en varias filas",
     mensajes: [
       { autor: "cliente", texto: "Buenas tardes, necesito que el doctor me revise unos resultados pero también me toca tomarme unos exámenes nuevos", hora: "11:02" },
       { autor: "bot", texto: "¡Buenas tardes! 👋 Con gusto te ayudo. Entonces necesitarías dos turnos:\n\n• *Consulta general* (para revisar resultados)\n• *Laboratorio* (para los exámenes nuevos)\n\n¿Los registro ambos?", hora: "11:02" },

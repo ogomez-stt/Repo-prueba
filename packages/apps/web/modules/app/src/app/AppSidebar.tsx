@@ -58,6 +58,9 @@ const SidebarFooter = observer(() => {
 
   const handleLogout = () => {
     // TODO: integrate with Cognito sign-out
+    // Cerrar sesión borra todo el estado (módulos, rol, simulación) y su
+    // persistencia en localStorage vía reset().
+    sessionStore.reset();
     navigate("/login");
   };
 
@@ -185,7 +188,7 @@ const SidebarContent = observer(() => {
               {puede("inicio") && <MenuItem icon={<GridIcon />} name="Inicio" path="/dashboard" isActive={isActive} />}
               {puede("turnos") && <MenuItem icon={<TaskIcon />} name="Mis Turnos" path="/turnos" isActive={isActive} />}
               {puede("recepcion") && <MenuItem icon={<PlusIcon />} name="Crear turno" path="/recepcion" isActive={isActive} />}
-              {puede("colas") && <MenuItem icon={<ListIcon />} name="Colas" path="/colas" isActive={isActive} />}
+              {puede("colas") && <MenuItem icon={<ListIcon />} name="Filas" path="/colas" isActive={isActive} />}
               {puede("encuestas") && <MenuItem icon={<ShootingStarIcon />} name="Encuestas" path="/encuestas" isActive={isActive} />}
               {sessionStore.isAdmin && (
                 <MenuItem icon={<GroupIcon />} name="Operadores" path="/turnos/operadores" isActive={isActive} />

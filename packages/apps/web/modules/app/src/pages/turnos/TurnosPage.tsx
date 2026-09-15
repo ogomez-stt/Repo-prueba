@@ -47,9 +47,9 @@ export const TurnosPage = observer(() => {
       <>
         <PageMeta title="Mis Turnos" description="Gestiona tus turnos del dia" />
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay colas</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea una cola para gestionar turnos.</p>
-          <Link to="/colas" className="mt-5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">Ir a Colas</Link>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay filas</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea una fila para gestionar turnos.</p>
+          <Link to="/colas" className="mt-5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">Ir a Filas</Link>
         </div>
       </>
     );
@@ -103,7 +103,7 @@ export const TurnosPage = observer(() => {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
-          Volver a colas
+          Volver a filas
         </Link>
       </div>
 
@@ -154,10 +154,10 @@ export const TurnosPage = observer(() => {
               ) : queue.waiting.length > 0 ? (
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-gray-500 dark:text-gray-400">Listo para el siguiente</p>
-                  <button onClick={() => queuesStore.callNext(queue.id)} className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">Iniciar cola ({queue.waiting[0].numero})</button>
+                  <button onClick={() => queuesStore.callNext(queue.id)} className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">Iniciar fila ({queue.waiting[0].numero})</button>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No hay turnos en cola</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">No hay turnos en fila</p>
               )}
             </div>
           </div>
@@ -177,7 +177,7 @@ export const TurnosPage = observer(() => {
               ) : (
                 <>
                   <p className="text-xs text-gray-400">Sin turno en atencion</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{queue.waiting.length > 0 ? `Siguiente en fila: ${queue.waiting[0].numero}` : "No hay turnos en cola"}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{queue.waiting.length > 0 ? `Siguiente en fila: ${queue.waiting[0].numero}` : "No hay turnos en fila"}</p>
                 </>
               )}
             </div>
@@ -290,7 +290,7 @@ export const TurnosPage = observer(() => {
           </div>
           <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">{cancelTicket?.reason === "noshow" ? "Marcar como no se presento" : "Cancelar turno"}</h4>
           <p className="text-sm text-gray-500 dark:text-gray-400">{cancelTicket && `${cancelTicket.ticket.numero} — ${cancelTicket.ticket.cliente}`}</p>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{cancelTicket?.reason === "noshow" ? "El turno se marcara como no presentado y saldra de la cola." : "Esta accion quitara el turno de la cola. No se puede deshacer."}</p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{cancelTicket?.reason === "noshow" ? "El turno se marcara como no presentado y saldra de la fila." : "Esta accion quitara el turno de la fila. No se puede deshacer."}</p>
           <div className="mt-6 flex justify-center gap-3">
             <Button size="sm" variant="outline" onClick={() => setCancelTicket(null)}>Volver</Button>
             <Button size="sm" variant="destructive" onClick={() => { if (cancelTicket) queuesStore.removeTicket(queue.id, cancelTicket.ticket.numero); setCancelTicket(null); }}>{cancelTicket?.reason === "noshow" ? "Marcar" : "Cancelar turno"}</Button>

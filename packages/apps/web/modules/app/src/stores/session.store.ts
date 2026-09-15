@@ -12,6 +12,47 @@ export type Modulo = "turnos" | "agendamiento";
 export type Rol = "administrador" | "operador";
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PERSISTENCIA (mock, localStorage)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// La sesión se guarda en localStorage para que sobreviva a recargas de página.
+// Sin esto, al recargar se pierden módulos/rol y el sidebar cae al fallback
+// (mostraba ambos módulos y ocultaba Operadores).
+
+const SESSION_KEY = "necto.session";
+
+interface SessionSnapshot {
+  modulos: Modulo[];
+  rol: Rol | null;
+  operadorSimuladoId: string | null;
+}
+
+function loadSession(): SessionSnapshot {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw) {
+      const s = JSON.parse(raw) as Partial<SessionSnapshot>;
+      return {
+        modulos: Array.isArray(s.modulos) ? s.modulos : [],
+        rol: s.rol ?? null,
+        operadorSimuladoId: s.operadorSimuladoId ?? null,
+      };
+    }
+  } catch {
+    // Sin localStorage o JSON inválido: sesión vacía.
+  }
+  return { modulos: [], rol: null, operadorSimuladoId: null };
+}
+
+function persistSession(s: SessionSnapshot): void {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+  } catch {
+    // Sin localStorage: no-op.
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SESSION STORE (mock)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -41,7 +82,21 @@ export class SessionStore {
   operadorSimuladoId: string | null = null;
 
   constructor() {
+    // Restaura la sesión guardada (sobrevive a recargas de página).
+    const s = loadSession();
+    this.modulos = s.modulos;
+    this.rol = s.rol;
+    this.operadorSimuladoId = s.operadorSimuladoId;
     makeAutoObservable(this);
+  }
+
+  /** Guarda el estado actual en localStorage. */
+  private persist() {
+    persistSession({
+      modulos: this.modulos,
+      rol: this.rol,
+      operadorSimuladoId: this.operadorSimuladoId,
+    });
   }
 
   // ── Getters de rol ──────────────────────────────────────────────────────
@@ -85,12 +140,13 @@ export class SessionStore {
     return null;
   }
 
-  /** Ruta funcional de entrada del módulo principal. */
+  /**
+   * Ruta de entrada tras iniciar sesión / entrar al módulo.
+   * Siempre "Inicio" (/dashboard) tanto para admin como para operador.
+   */
   get moduloEntryPath() {
-    const m = this.moduloPrincipal;
-    if (m === "turnos") return "/turnos";
-    if (m === "agendamiento") return "/agendamiento";
-    return "/seleccionar";
+    if (this.moduloPrincipal === null) return "/seleccionar";
+    return "/dashboard";
   }
 
   // ── Estado del flujo ────────────────────────────────────────────────────
@@ -173,6 +229,9 @@ export class SessionStore {
   get homePathActual() {
     const op = this.operadorSimulado;
     if (op) {
+      // Preferimos Inicio (/dashboard) si lo tiene permitido; si no, su
+      // primera sección permitida (para no caer en una ruta bloqueada).
+      if (op.permisos.includes("inicio")) return "/dashboard";
       const primera = SECCIONES[op.modulo].find((s) => op.permisos.includes(s.id));
       if (primera) return primera.path;
     }
@@ -188,21 +247,25 @@ export class SessionStore {
     } else {
       this.modulos = [...this.modulos, modulo];
     }
+    this.persist();
   }
 
   /** Reemplaza la lista de módulos seleccionados. */
   setModulos(modulos: Modulo[]) {
     this.modulos = modulos;
+    this.persist();
   }
 
   setRol(rol: Rol) {
     this.rol = rol;
+    this.persist();
   }
 
   /** Aplica la selección completa de una sola vez. */
   configurar(modulos: Modulo[], rol: Rol) {
     this.modulos = modulos;
     this.rol = rol;
+    this.persist();
   }
 
   /**
@@ -215,6 +278,7 @@ export class SessionStore {
     this.operadorSimuladoId = operadorId;
     this.rol = "operador";
     this.modulos = [op.modulo];
+    this.persist();
   }
 
   /** Sale del modo simulación y limpia todo (vuelve al inicio del flujo). */
@@ -227,6 +291,7 @@ export class SessionStore {
     this.modulos = [];
     this.rol = null;
     this.operadorSimuladoId = null;
+    this.persist();
   }
 }
 

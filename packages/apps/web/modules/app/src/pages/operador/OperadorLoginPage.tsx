@@ -39,8 +39,9 @@ export const OperadorLoginPage = observer(() => {
   const entrar = () => {
     if (!elegido) return;
     sessionStore.simular(elegido.id);
-    // Entra directo al módulo del operador (modo simulación ya activo).
-    navigate(elegido.modulo === "turnos" ? "/turnos" : "/agendamiento");
+    // Entra a Inicio (modo simulación ya activo). Si el operador no tiene
+    // permiso a "inicio", homePathActual lo lleva a su primera sección.
+    navigate(sessionStore.homePathActual);
   };
 
   const totalSecciones = elegido ? SECCIONES[elegido.modulo].length : 0;

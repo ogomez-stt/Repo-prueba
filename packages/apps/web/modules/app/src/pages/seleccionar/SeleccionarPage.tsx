@@ -56,7 +56,7 @@ const MODULOS: ModuloOption[] = [
   {
     id: "turnos",
     titulo: "Turnos",
-    descripcion: "Gestiona la fila en vivo: colas, atención de turnos, display de sala y encuestas.",
+    descripcion: "Gestiona la fila en vivo: filas, atención de turnos, display de sala y encuestas.",
     icon: TurnosIcon,
   },
   {
@@ -78,7 +78,7 @@ const ROLES: RolOption[] = [
   {
     id: "administrador",
     titulo: "Administrador",
-    descripcion: "Acceso completo: configuración, colas/profesionales, reportes y ajustes del negocio.",
+    descripcion: "Acceso completo: configuración, filas/profesionales, reportes y ajustes del negocio.",
     icon: AdminIcon,
   },
   {

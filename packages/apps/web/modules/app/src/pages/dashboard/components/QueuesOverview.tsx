@@ -20,7 +20,7 @@ export const QueuesOverview = observer(() => {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-theme-sm dark:bg-gray-900">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Estado de colas</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Estado de filas</h3>
         <button onClick={() => navigate("/colas")} className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
           Ver todas
         </button>

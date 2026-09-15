@@ -71,7 +71,7 @@ export const SurveyCharts = observer(() => {
         </div>
       </Card>
       <Card>
-        <CardTitle>Satisfaccion por cola</CardTitle>
+        <CardTitle>Satisfaccion por fila</CardTitle>
         <div className="mt-4">
           <BarChart series={queueSeries} options={queueOptions} height={240} />
         </div>

@@ -31,12 +31,12 @@ export const ConfigureDisplayModal = observer(({ isOpen, onClose }: ConfigureDis
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[480px] p-6">
       <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Configurar pantalla de sala</h4>
       <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-        Elige que cola mostrar en la pantalla de la sala de espera.
+        Elige que fila mostrar en la pantalla de la sala de espera.
       </p>
 
       <div className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Cola a mostrar</label>
+          <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Fila a mostrar</label>
           <div className="space-y-2">
             {queues.map((q) => (
               <button
@@ -58,7 +58,7 @@ export const ConfigureDisplayModal = observer(({ isOpen, onClose }: ConfigureDis
             ))}
             {queues.length === 0 && (
               <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-gray-800">
-                No hay colas. Crea una primero.
+                No hay filas. Crea una primero.
               </p>
             )}
           </div>

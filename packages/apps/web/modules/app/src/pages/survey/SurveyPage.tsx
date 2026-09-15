@@ -80,13 +80,13 @@ export const SurveyPage = observer(() => {
       <PageMeta title="Encuesta de satisfacción" description="Cuéntanos cómo estuvo tu experiencia" />
 
       <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-7 shadow-theme-lg dark:border-gray-800 dark:bg-gray-900 sm:p-8">
-        {/* Branding */}
-        <div className="mb-6 flex items-center justify-center gap-2">
+        {/* Branding: logo grande arriba, centrado, y nombre del negocio debajo */}
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
           {cfg.logoUrl ? (
-            <img src={cfg.logoUrl} alt={cfg.businessName} className="h-8 w-8 rounded-lg object-cover" />
+            <img src={cfg.logoUrl} alt={cfg.businessName} className="h-20 w-20 rounded-2xl object-contain" />
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+            <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-brand-500 text-white">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-10 w-10">
                 <path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z" />
               </svg>
             </span>

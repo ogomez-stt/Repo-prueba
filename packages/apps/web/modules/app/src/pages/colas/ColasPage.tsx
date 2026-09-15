@@ -47,8 +47,8 @@ export const ColasPage = observer(() => {
   const totalWaiting = queues.reduce((s, q) => s + (q.activa ? q.waiting.length : 0), 0);
 
   const subtitle = queues.length === 0
-    ? "Aun no tienes colas"
-    : `${activeCount} ${activeCount === 1 ? "cola activa" : "colas activas"} · ${totalWaiting} ${totalWaiting === 1 ? "persona esperando" : "personas esperando"} en total`;
+    ? "Aun no tienes filas"
+    : `${activeCount} ${activeCount === 1 ? "fila activa" : "filas activas"} · ${totalWaiting} ${totalWaiting === 1 ? "persona esperando" : "personas esperando"} en total`;
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -100,7 +100,7 @@ export const ColasPage = observer(() => {
         tiempoProm: Number(form.tiempo) || 10,
         campos,
       });
-      showToast("Cola actualizada");
+      showToast("Fila actualizada");
     } else {
       queuesStore.createQueue({
         nombre: form.nombre,
@@ -109,21 +109,21 @@ export const ColasPage = observer(() => {
         tiempoProm: Number(form.tiempo) || 10,
         campos,
       });
-      showToast("Cola creada");
+      showToast("Fila creada");
     }
     setModalOpen(false);
   };
 
   const toggleQueue = (id: string, active: boolean) => {
     queuesStore.toggleQueue(id, active);
-    showToast(active ? "Cola reanudada" : "Cola pausada");
+    showToast(active ? "Fila reanudada" : "Fila pausada");
   };
 
   const confirmDelete = () => {
     if (!deleteId) return;
     queuesStore.deleteQueue(deleteId);
     setDeleteId(null);
-    showToast("Cola eliminada");
+    showToast("Fila eliminada");
   };
 
   const shareQueue = (q: Queue) => {
@@ -135,7 +135,7 @@ export const ColasPage = observer(() => {
 
   return (
     <>
-      <PageMeta title="Colas" description="Administra tus colas de atencion" />
+      <PageMeta title="Filas" description="Administra tus filas de atencion" />
 
       {/* Toast (top-center) */}
       {toast && (
@@ -147,11 +147,11 @@ export const ColasPage = observer(() => {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Colas</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Filas</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         </div>
-        {/* Crear cola: solo admin */}
-        {esAdmin && <Button size="sm" onClick={openCreate}>+ Crear cola</Button>}
+        {/* Crear fila: solo admin */}
+        {esAdmin && <Button size="sm" onClick={openCreate}>+ Crear fila</Button>}
       </div>
 
       {/* Grid or empty state */}
@@ -162,19 +162,19 @@ export const ColasPage = observer(() => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Aun no tienes colas</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Aun no tienes filas</h3>
           {esAdmin ? (
             <>
               <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
                 Crea la primera para empezar a recibir turnos por WhatsApp.
               </p>
               <button onClick={openCreate} className="mt-5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600">
-                Crear cola
+                Crear fila
               </button>
             </>
           ) : (
             <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-              El administrador aún no te ha asignado colas. Pídele acceso para empezar a gestionarlas.
+              El administrador aún no te ha asignado filas. Pídele acceso para empezar a gestionarlas.
             </p>
           )}
         </div>
@@ -199,11 +199,11 @@ export const ColasPage = observer(() => {
       {/* Create / edit modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} className="max-w-[480px] p-6">
         <h4 className="mb-5 text-lg font-semibold text-gray-800 dark:text-white/90">
-          {editingId ? "Editar cola" : "Crear cola"}
+          {editingId ? "Editar fila" : "Crear fila"}
         </h4>
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la cola</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la fila</label>
             <input
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
@@ -261,7 +261,7 @@ export const ColasPage = observer(() => {
               </button>
             </div>
             <p className="mb-3 text-xs text-gray-400">
-              Datos que el operador (o el bot) debe llenar al crear un turno en esta cola. Ej: Pedido, Motivo, Documento.
+              Datos que el operador (o el bot) debe llenar al crear un turno en esta fila. Ej: Pedido, Motivo, Documento.
             </p>
 
             {form.campos.length === 0 ? (
@@ -326,7 +326,7 @@ export const ColasPage = observer(() => {
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button size="sm" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-          <Button size="sm" onClick={saveQueue}>{editingId ? "Guardar" : "Crear cola"}</Button>
+          <Button size="sm" onClick={saveQueue}>{editingId ? "Guardar" : "Crear fila"}</Button>
         </div>
       </Modal>
 
@@ -338,7 +338,7 @@ export const ColasPage = observer(() => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
             </svg>
           </div>
-          <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">Eliminar cola</h4>
+          <h4 className="mb-2 text-lg font-semibold text-gray-800 dark:text-white/90">Eliminar fila</h4>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {deletingQueue && `Se eliminara "${deletingQueue.nombre}".`} Esta accion no se puede deshacer.
           </p>

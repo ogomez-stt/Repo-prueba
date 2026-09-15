@@ -78,7 +78,7 @@ export const EncuestasPage = observer(() => {
 
   const queueOptions = useMemo(() => {
     const names = Array.from(new Set(queuesStore.surveys.map((s) => s.queueName)));
-    return [{ value: "all", label: "Todas las colas" }, ...names.map((n) => ({ value: n, label: n }))];
+    return [{ value: "all", label: "Todas las filas" }, ...names.map((n) => ({ value: n, label: n }))];
   }, [queuesStore.surveys]);
 
   const filtered = queuesStore.surveys.filter((s) => {

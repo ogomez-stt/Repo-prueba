@@ -59,7 +59,7 @@ export const RecepcionPage = observer(() => {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!colaId) e.cola = "Elige una cola";
+    if (!colaId) e.cola = "Elige una fila";
     if (!cliente.trim()) e.cliente = "El nombre es obligatorio";
     const phone = telefono.replace(/[^\d+]/g, "");
     if (!telefono.trim()) e.telefono = "El teléfono es obligatorio";
@@ -116,7 +116,7 @@ export const RecepcionPage = observer(() => {
                   <span className="font-medium text-gray-800 dark:text-white/90">{created.cliente}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Cola</span>
+                  <span className="text-gray-500">Fila</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">{created.colaNombre}</span>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export const RecepcionPage = observer(() => {
             <div className="flex gap-3 border-t border-gray-200 px-8 py-5 dark:border-gray-800">
               <Button className="flex-1" onClick={() => setCreated(null)}>Crear otro turno</Button>
               <Button variant="outline" className="flex-1" onClick={() => navigate(`/turnos?cola=${colaId}`)}>
-                Ver la cola
+                Ver la fila
               </Button>
             </div>
           </div>
@@ -158,9 +158,9 @@ export const RecepcionPage = observer(() => {
 
       {queues.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-16 text-center dark:border-gray-700 dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay colas activas</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea o activa una cola para poder registrar turnos.</p>
-          <Button size="sm" className="mt-5" onClick={() => navigate("/colas")}>Ir a Colas</Button>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay filas activas</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea o activa una fila para poder registrar turnos.</p>
+          <Button size="sm" className="mt-5" onClick={() => navigate("/colas")}>Ir a Filas</Button>
         </div>
       ) : (
         <>
@@ -168,7 +168,7 @@ export const RecepcionPage = observer(() => {
         <div className="mb-6">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              ¿En qué cola creas el turno? <RequiredMark />
+              ¿En qué fila creas el turno? <RequiredMark />
             </p>
             {errors.cola && <p className="text-xs text-error-500">{errors.cola}</p>}
           </div>
@@ -247,10 +247,10 @@ export const RecepcionPage = observer(() => {
                 <div className="border-t border-gray-100 pt-5 dark:border-gray-800">
                   {!queue ? (
                     <p className="rounded-xl border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400 dark:border-gray-700">
-                      Elige una cola para ver sus campos.
+                      Elige una fila para ver sus campos.
                     </p>
                   ) : campos.length === 0 ? (
-                    <p className="text-xs text-gray-400">Esta cola no pide datos adicionales.</p>
+                    <p className="text-xs text-gray-400">Esta fila no pide datos adicionales.</p>
                   ) : (
                     <div className="space-y-5">
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -312,7 +312,7 @@ export const RecepcionPage = observer(() => {
               <div className="mb-4 flex items-center gap-2.5">
                 <span className={`h-3 w-3 rounded-full ${queue?.color ?? "bg-gray-300"}`} />
                 <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                  {queue ? queue.nombre : "Sin cola"}
+                  {queue ? queue.nombre : "Sin fila"}
                 </h3>
               </div>
               {contexto ? (
@@ -330,7 +330,7 @@ export const RecepcionPage = observer(() => {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">Elige una cola para ver su estado.</p>
+                <p className="text-sm text-gray-400">Elige una fila para ver su estado.</p>
               )}
             </div>
           </div>

@@ -74,7 +74,7 @@ export const DisplayScreen = observer(() => {
   if (!queue) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary-950 text-white">
-        <p className="text-2xl">No hay cola seleccionada</p>
+        <p className="text-2xl">No hay fila seleccionada</p>
       </div>
     );
   }

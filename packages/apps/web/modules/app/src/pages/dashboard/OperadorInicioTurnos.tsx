@@ -43,7 +43,7 @@ export const OperadorInicioTurnos = observer(() => {
         <Header nombre={operador?.nombre} />
         <Card>
           <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            No tienes colas asignadas. Pídele al administrador acceso a una cola.
+            No tienes filas asignadas. Pídele al administrador acceso a una fila.
           </p>
         </Card>
       </>
@@ -92,7 +92,7 @@ export const OperadorInicioTurnos = observer(() => {
         />
         <Card>
           <div className="flex h-full flex-col justify-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Estado de la cola</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Estado de la fila</p>
             <div className="mt-2">
               <Badge color={sat.color} size="md">{cola.activa ? sat.label : "Pausada"}</Badge>
             </div>

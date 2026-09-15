@@ -30,7 +30,7 @@ export const CurrentTicketCard = observer(({ onAction }: CurrentTicketCardProps)
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl bg-brand-500 p-6 text-center text-white shadow-theme-md">
         <p className="text-sm font-medium uppercase tracking-wide text-white/70">Turno Actual</p>
-        <p className="mt-4 text-lg font-medium">No hay colas configuradas</p>
+        <p className="mt-4 text-lg font-medium">No hay filas configuradas</p>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export const CurrentTicketCard = observer(({ onAction }: CurrentTicketCardProps)
           value={queue.id}
           onChange={(e) => setColaId(e.target.value)}
           className="max-w-[45%] truncate rounded-lg border border-white/30 bg-white/15 px-3 py-1.5 text-sm font-medium text-white outline-none focus:border-white/60 [&>option]:text-gray-800"
-          aria-label="Seleccionar cola"
+          aria-label="Seleccionar fila"
         >
           {queues.map((q) => (
             <option key={q.id} value={q.id}>{q.nombre}</option>
@@ -67,14 +67,14 @@ export const CurrentTicketCard = observer(({ onAction }: CurrentTicketCardProps)
           <p className="mt-1 text-sm text-white/70">
             {queue.waiting.length > 0
               ? `${queue.waiting.length} en espera. Llama el siguiente para empezar.`
-              : "Esta cola no tiene a nadie esperando."}
+              : "Esta fila no tiene a nadie esperando."}
           </p>
         </div>
       )}
 
       <div className="flex items-center justify-between border-t border-white/15 pt-4">
         <div className="text-sm text-white/75">
-          <span className="text-white/60">Cola:</span>{" "}
+          <span className="text-white/60">Fila:</span>{" "}
           <span className="font-semibold text-white">{queue.nombre}</span>
         </div>
         <button

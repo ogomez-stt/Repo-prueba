@@ -89,13 +89,13 @@ export const DashboardCharts = observer(() => {
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:col-span-1">
         <Card>
-          <CardTitle>En espera por cola</CardTitle>
+          <CardTitle>En espera por fila</CardTitle>
           <div className="mt-2 flex justify-center">
             <PieChart series={distributionSeries} options={distributionOptions} height={260} />
           </div>
         </Card>
         <Card>
-          <CardTitle>Espera promedio por cola</CardTitle>
+          <CardTitle>Espera promedio por fila</CardTitle>
           <div className="mt-4">
             <BarChart series={waitSeries} options={waitOptions} height={220} />
           </div>
