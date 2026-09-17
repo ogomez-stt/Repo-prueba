@@ -97,6 +97,9 @@ const CitaCard = observer(({ cita, onOpen }: { cita: Cita; onOpen: () => void })
   );
 });
 
+/** Valor especial del selector: ver la agenda de todos los profesionales. */
+const TODOS = "all";
+
 export const AgendaPage = observer(() => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -104,26 +107,45 @@ export const AgendaPage = observer(() => {
 
   // Profesionales visibles (en simulación de operador, solo los suyos).
   const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
-  // Profesional actual: del ?prof= si es visible, si no el primero visible.
+  const idsVisibles = new Set(profesionalesVisibles.map((p) => p.id));
+
+  // Alcance actual: "Todos" por defecto, o un profesional concreto del ?prof=
+  // (si es visible). "Todos" respeta permisos = todos los profesionales visibles.
   const profParam = searchParams.get("prof");
   const profId =
-    (profParam && sessionStore.puedeVerProfesional(profParam) ? profParam : "") ||
-    profesionalesVisibles[0]?.id ||
-    "";
-  const prof = agendaStore.getProfesional(profId);
+    profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
+      ? profParam
+      : TODOS;
+  const verTodos = profId === TODOS;
+  const prof = verTodos ? null : agendaStore.getProfesional(profId);
 
-  // Solo citas de ESTE profesional (agenda independiente).
+  // Citas del alcance actual (un profesional, o todos los visibles).
   const filtered = useMemo(() => {
     return agendaStore.upcoming.filter((c) => {
-      const mismoProf = c.profesionalId === profId;
+      const enAlcance = verTodos ? idsVisibles.has(c.profesionalId) : c.profesionalId === profId;
       const me = estadoFilter === "all" || c.estado === estadoFilter;
-      return mismoProf && me;
+      return enAlcance && me;
     });
-  }, [profId, estadoFilter, agendaStore.citas.slice()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profId, verTodos, estadoFilter, agendaStore.citas.slice()]);
 
   const grupos = agendaStore.groupedByDay(filtered);
 
-  const profOptions = profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
+  // KPIs: del profesional concreto, o agregados de todos los visibles.
+  const kpiCitasHoy = verTodos
+    ? profesionalesVisibles.reduce((s, p) => s + agendaStore.citasHoyDe(p.id), 0)
+    : agendaStore.citasHoyDe(profId);
+  const kpiPorConfirmar = verTodos
+    ? profesionalesVisibles.reduce((s, p) => s + agendaStore.pendientesDe(p.id), 0)
+    : agendaStore.pendientesDe(profId);
+  const kpiTotal = verTodos
+    ? profesionalesVisibles.reduce((s, p) => s + agendaStore.citasDeProfesional(p.id).length, 0)
+    : agendaStore.citasDeProfesional(profId).length;
+
+  const profOptions = [
+    { value: TODOS, label: "Todos los profesionales" },
+    ...profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` })),
+  ];
   const estadoOptions = [
     { value: "all", label: "Todos los estados" },
     { value: "pendiente", label: "Pendiente" },
@@ -132,11 +154,11 @@ export const AgendaPage = observer(() => {
     { value: "cancelada", label: "Cancelada" },
   ];
 
-  // Sin profesionales: invita a crearlos.
-  if (!prof) {
+  // Sin profesionales del todo: invita a crearlos.
+  if (profesionalesVisibles.length === 0) {
     return (
       <>
-        <PageMeta title="Agenda" description="Agenda por profesional" />
+        <PageMeta title="Agenda" description="Agenda de citas" />
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white py-20 text-center dark:border-gray-700 dark:bg-gray-900">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">No hay profesionales</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Crea un profesional para gestionar su agenda de citas.</p>
@@ -146,57 +168,74 @@ export const AgendaPage = observer(() => {
     );
   }
 
+  const irACrear = () =>
+    navigate(verTodos ? "/agendamiento/crear" : `/agendamiento/crear?prof=${profId}`);
+
   return (
     <>
-      <PageMeta title={`Agenda de ${prof.nombre}`} description="Agenda del profesional" />
+      <PageMeta
+        title={verTodos ? "Agenda" : `Agenda de ${prof?.nombre ?? ""}`}
+        description="Agenda de citas"
+      />
 
-      {/* Volver a profesionales */}
-      <div className="mb-4">
-        <Link to="/agendamiento/profesionales" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Todos los profesionales
-        </Link>
-      </div>
+      {/* Volver a todos — solo cuando se ve un profesional concreto */}
+      {!verTodos && (
+        <div className="mb-4">
+          <Link to="/agendamiento" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Todos los profesionales
+          </Link>
+        </div>
+      )}
 
-      {/* Header con el profesional */}
+      {/* Header: profesional concreto o vista global */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">{prof.nombre}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{prof.especialidad} · agenda de citas</p>
-          </div>
+          {prof ? (
+            <>
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">{prof.nombre}</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{prof.especialidad} · agenda de citas</p>
+              </div>
+            </>
+          ) : (
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Agenda</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Citas de todos los profesionales</p>
+            </div>
+          )}
         </div>
-        <Button size="sm" startIcon={<PlusIcon />} onClick={() => navigate(`/agendamiento/crear?prof=${prof.id}`)}>Agendar cita</Button>
+        <Button size="sm" startIcon={<PlusIcon />} onClick={irACrear}>Agendar cita</Button>
       </div>
 
-      {/* KPIs del profesional */}
+      {/* KPIs (del profesional o agregados de todos) */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <MetricCard
           layout="horizontal"
           icon={<CalenderIcon className="size-6" />}
           title="Citas hoy"
-          value={String(agendaStore.citasHoyDe(prof.id))}
+          value={String(kpiCitasHoy)}
         />
         <MetricCard
           layout="horizontal"
           icon={<TimeIcon className="size-6" />}
           title="Por confirmar"
-          value={String(agendaStore.pendientesDe(prof.id))}
+          value={String(kpiPorConfirmar)}
           iconBgClass="bg-warning-50 text-warning-600 dark:bg-warning-500/15"
         />
         <MetricCard
           layout="horizontal"
           icon={<GroupIcon className="size-6" />}
           title="Total de citas"
-          value={String(agendaStore.citasDeProfesional(prof.id).length)}
+          value={String(kpiTotal)}
           iconBgClass="bg-brand-50 text-brand-600 dark:bg-brand-500/15"
         />
       </div>
 
-      {/* Cambiar de profesional + filtro de estado */}
+      {/* Alcance (profesional / todos) + filtro de estado */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <div className="sm:w-72">
           <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento?prof=${v}`)} options={profOptions} />
@@ -209,7 +248,9 @@ export const AgendaPage = observer(() => {
         {grupos.length === 0 ? (
           <Card className="py-16 text-center">
             <p className="text-lg font-semibold text-gray-800 dark:text-white/90">Sin citas próximas</p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{prof.nombre} no tiene citas con estos filtros.</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {verTodos ? "No hay citas con estos filtros." : `${prof?.nombre ?? "El profesional"} no tiene citas con estos filtros.`}
+            </p>
           </Card>
         ) : (
           grupos.map((g) => (

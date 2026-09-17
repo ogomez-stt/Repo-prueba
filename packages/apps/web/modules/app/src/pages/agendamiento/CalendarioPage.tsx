@@ -9,7 +9,8 @@ import { Modal } from "@/elements/ui/modal";
 import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Select } from "@/elements/form/select";
-import { agendaStore, sessionStore, todayIso, type Modalidad } from "@/stores";
+import { Tab, type TabItem } from "@/elements/ui/tabs";
+import { agendaStore, sessionStore, todayIso, type Cita, type Modalidad } from "@/stores";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -18,18 +19,37 @@ const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 const RequiredMark = () => <span className="text-error-500">*</span>;
 
-const GearIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
+/** Valor especial del selector: ver el calendario de todos los profesionales. */
+const TODOS = "all";
 
-const DIA_OPTS = [
-  { d: 1, label: "Lun" }, { d: 2, label: "Mar" }, { d: 3, label: "Mié" },
-  { d: 4, label: "Jue" }, { d: 5, label: "Vie" }, { d: 6, label: "Sáb" }, { d: 0, label: "Dom" },
-];
-const HORA_OPTS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }));
+/**
+ * CitaBloque — bloque de una cita dentro de una franja del timeline diario.
+ * Muestra cliente, servicio, estado y (para distinguir en "Todos") el avatar y
+ * nombre del profesional con su color.
+ */
+const CitaBloque = observer(({ cita, onOpen }: { cita: Cita; onOpen: () => void }) => {
+  const prof = agendaStore.getProfesional(cita.profesionalId);
+  return (
+    <div
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer rounded-lg border border-gray-200 p-3 transition-colors hover:border-brand-300 dark:border-gray-800"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{cita.cliente}</p>
+        <Badge size="xs" color={agendaStore.estadoBadgeColor(cita.estado)}>{agendaStore.estadoLabel(cita.estado)}</Badge>
+      </div>
+      <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{cita.servicio}</p>
+      {prof && (
+        <div className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+          {prof.nombre}
+        </div>
+      )}
+    </div>
+  );
+});
 
 export const CalendarioPage = observer(() => {
   const navigate = useNavigate();
@@ -38,16 +58,26 @@ export const CalendarioPage = observer(() => {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [selected, setSelected] = useState<string>(todayIso());
+  // Vista activa: cuadrícula del mes o timeline del día.
+  const [vista, setVista] = useState<"mes" | "dia">("mes");
 
   // Profesionales visibles (en simulación de operador, solo los suyos).
   const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
-  // Profesional actual: del ?prof= si es visible, si no el primero visible.
+
+  // Alcance actual: "Todos" por defecto, o un profesional concreto del ?prof=.
   const profParam = searchParams.get("prof");
   const profId =
-    (profParam && sessionStore.puedeVerProfesional(profParam) ? profParam : "") ||
-    profesionalesVisibles[0]?.id ||
-    "";
-  const prof = agendaStore.getProfesional(profId);
+    profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
+      ? profParam
+      : TODOS;
+  const verTodos = profId === TODOS;
+  // profScope: undefined en "Todos" (los helpers del store lo interpretan como
+  // "todos"), o el id concreto. Nota: cuando el operador ve "Todos" ve todos SUS
+  // profesionales; el store no filtra por permisos aquí, pero el catálogo de
+  // citas ya está acotado a los profesionales del negocio y el selector solo
+  // ofrece los visibles.
+  const profScope = verTodos ? undefined : profId;
+  const prof = verTodos ? null : agendaStore.getProfesional(profId);
 
   // Nueva cita (desde un slot libre) — el profesional lo fija el calendario actual
   const [crearOpen, setCrearOpen] = useState(false);
@@ -57,31 +87,6 @@ export const CalendarioPage = observer(() => {
   const [servicio, setServicio] = useState("");
   const [modalidad, setModalidad] = useState<Modalidad>("presencial");
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Config del calendario
-  const [configOpen, setConfigOpen] = useState(false);
-  const [cfgDias, setCfgDias] = useState<number[]>(agendaStore.calendarConfig.diasLaborales);
-  const [cfgInicio, setCfgInicio] = useState(String(agendaStore.calendarConfig.horaInicio));
-  const [cfgFin, setCfgFin] = useState(String(agendaStore.calendarConfig.horaFin));
-  const [cfgSlot, setCfgSlot] = useState(String(agendaStore.calendarConfig.duracionSlot));
-
-  const openConfig = () => {
-    setCfgDias([...agendaStore.calendarConfig.diasLaborales]);
-    setCfgInicio(String(agendaStore.calendarConfig.horaInicio));
-    setCfgFin(String(agendaStore.calendarConfig.horaFin));
-    setCfgSlot(String(agendaStore.calendarConfig.duracionSlot));
-    setConfigOpen(true);
-  };
-  const toggleDia = (d: number) => setCfgDias((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
-  const guardarConfig = () => {
-    agendaStore.updateCalendarConfig({
-      diasLaborales: cfgDias,
-      horaInicio: Number(cfgInicio),
-      horaFin: Number(cfgFin),
-      duracionSlot: Number(cfgSlot),
-    });
-    setConfigOpen(false);
-  };
 
   // ── Month grid (Mon-first) ──
   const firstDay = new Date(year, month, 1);
@@ -96,9 +101,36 @@ export const CalendarioPage = observer(() => {
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
   const goToday = () => { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelected(todayIso()); };
 
-  const citasDia = agendaStore.citasDelDia(selected, profId);
-  const slots = agendaStore.horariosDisponibles(selected, profId);
+  const citasDia = agendaStore.citasDelDia(selected, profScope);
+  // Los horarios libres son por-profesional; en "Todos" no aplican.
+  const slots = verTodos ? [] : agendaStore.horariosDisponibles(selected, profScope);
   const selectedLegible = new Date(selected + "T00:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+
+  // ── Vista de día (timeline por horas) ──
+  // Etiquetas de las franjas horarias, según la config del calendario.
+  const franjas: string[] = [];
+  {
+    const { horaInicio, horaFin, duracionSlot } = agendaStore.configDe(profScope);
+    for (let mins = horaInicio * 60; mins < horaFin * 60; mins += duracionSlot) {
+      franjas.push(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
+    }
+  }
+  // Citas del día indexadas por su franja (la cita cae en la franja cuya etiqueta coincide con su hora).
+  const citasPorFranja = (hora: string): Cita[] => citasDia.filter((c) => c.hora === hora);
+
+  const vistaTabs: TabItem[] = [
+    { key: "mes", label: "Mes" },
+    { key: "dia", label: "Día" },
+  ];
+
+  // Abrir la vista de día en una fecha concreta (desde el grid).
+  const abrirDia = (iso: string) => { setSelected(iso); setVista("dia"); };
+  // Navegación de día anterior/siguiente en la vista de día.
+  const shiftDay = (delta: number) => {
+    const d = new Date(selected + "T00:00:00");
+    d.setDate(d.getDate() + delta);
+    setSelected(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  };
 
   const openCrear = (hora: string) => {
     setSlotHora(hora);
@@ -114,11 +146,13 @@ export const CalendarioPage = observer(() => {
     if (!servicio.trim()) e.servicio = "Servicio obligatorio";
     setErrors(e);
     if (Object.keys(e).length > 0) return;
-    agendaStore.crearCita({ cliente: cliente.trim(), telefono: telefono.trim(), profesionalId: profId, servicio: servicio.trim(), fecha: selected, hora: slotHora, modalidad });
+    if (!prof) return; // por seguridad: crear en slot solo con profesional concreto
+    agendaStore.crearCita({ cliente: cliente.trim(), telefono: telefono.trim(), profesionalId: prof.id, servicio: servicio.trim(), fecha: selected, hora: slotHora, modalidad });
     setCrearOpen(false);
   };
 
-  if (!prof) {
+  // Sin profesionales del todo: invita a crearlos.
+  if (profesionalesVisibles.length === 0) {
     return (
       <>
         <PageMeta title="Calendario" description="Vista mensual de citas" />
@@ -133,37 +167,61 @@ export const CalendarioPage = observer(() => {
 
   return (
     <>
-      <PageMeta title={`Calendario de ${prof.nombre}`} description="Vista mensual de citas del profesional" />
+      <PageMeta title={verTodos ? "Calendario" : `Calendario de ${prof?.nombre ?? ""}`} description="Vista mensual de citas" />
 
-      {/* Volver a profesionales */}
-      <div className="mb-4">
-        <Link to="/agendamiento/profesionales" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Todos los profesionales
-        </Link>
-      </div>
+      {/* Volver a todos — solo cuando se ve un profesional concreto */}
+      {!verTodos && (
+        <div className="mb-4">
+          <Link to="/agendamiento/calendario" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Todos los profesionales
+          </Link>
+        </div>
+      )}
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Calendario</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{prof.nombre} · {prof.especialidad}</p>
-          </div>
+          {prof ? (
+            <>
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Calendario</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{prof.nombre} · {prof.especialidad}</p>
+              </div>
+            </>
+          ) : (
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Calendario</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Citas de todos los profesionales</p>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {/* Toggle Mes / Día */}
+          <Tab
+            items={vistaTabs}
+            activeTab={vista}
+            onTabChange={(k) => setVista(k as "mes" | "dia")}
+          />
           <div className="sm:w-56">
-            <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)} options={profesionalesVisibles.map((p) => ({ value: p.id, label: p.nombre }))} />
+            <Select
+              defaultValue={profId}
+              onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)}
+              options={[
+                { value: TODOS, label: "Todos los profesionales" },
+                ...profesionalesVisibles.map((p) => ({ value: p.id, label: p.nombre })),
+              ]}
+            />
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={goToday}>Hoy</Button>
-            <Button size="sm" variant="outline" startIcon={<GearIcon />} onClick={openConfig}>Configurar</Button>
           </div>
         </div>
       </div>
 
+      {vista === "mes" && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Calendario */}
         <div className="lg:col-span-2">
@@ -193,20 +251,28 @@ export const CalendarioPage = observer(() => {
               {cells.map((d, i) => {
                 if (d === null) return <div key={i} />;
                 const iso = isoOf(year, month, d);
-                const count = agendaStore.countByDay(iso, profId);
+                const count = agendaStore.countByDay(iso, profScope);
                 const isToday = iso === todayIso();
                 const isSelected = iso === selected;
-                const laboral = agendaStore.esDiaLaboral(iso);
+                const laboral = agendaStore.esDiaLaboral(iso, profScope);
+                // Día bloqueado: no laboral para el profesional concreto seleccionado.
+                // En "Todos" no se bloquea (cada profesional trabaja días distintos).
+                const bloqueado = !laboral && !verTodos;
                 return (
                   <button
                     key={i}
-                    onClick={() => setSelected(iso)}
+                    disabled={bloqueado}
+                    onClick={() => { if (!bloqueado) abrirDia(iso); }}
+                    title={bloqueado ? "El profesional no atiende este día" : (count > 0 ? `${count} ${count === 1 ? "cita" : "citas"} · ver día` : "Ver día")}
                     className={
                       "flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border text-sm transition-colors " +
-                      (isSelected
+                      (isSelected && !bloqueado
                         ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
-                        : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50") +
-                      (!laboral ? " opacity-40" : "")
+                        : "border-transparent") +
+                      (bloqueado
+                        ? " cursor-not-allowed opacity-40"
+                        : " hover:bg-gray-50 dark:hover:bg-gray-800/50") +
+                      (!laboral && verTodos ? " opacity-40" : "")
                     }
                   >
                     <span className={
@@ -215,11 +281,10 @@ export const CalendarioPage = observer(() => {
                     }>
                       {d}
                     </span>
+                    {/* Contador de citas — escala con cualquier cantidad */}
                     {count > 0 && (
-                      <span className="flex items-center gap-0.5">
-                        {Array.from({ length: Math.min(count, 3) }).map((_, k) => (
-                          <span key={k} className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-                        ))}
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-500 px-1.5 text-[11px] font-semibold leading-4 text-white">
+                        {count}
                       </span>
                     )}
                   </button>
@@ -234,7 +299,8 @@ export const CalendarioPage = observer(() => {
           <Card>
             <h3 className="text-sm font-semibold capitalize text-gray-800 dark:text-white/90">{selectedLegible}</h3>
             <p className="mt-0.5 text-xs text-gray-400">
-              {citasDia.length} {citasDia.length === 1 ? "cita" : "citas"} · {slots.length} horarios libres
+              {citasDia.length} {citasDia.length === 1 ? "cita" : "citas"}
+              {!verTodos && ` · ${slots.length} horarios libres`}
             </p>
 
             {/* Citas del día */}
@@ -264,42 +330,122 @@ export const CalendarioPage = observer(() => {
               )}
             </div>
 
-            {/* Horarios disponibles */}
-            <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Horarios disponibles</p>
-              {slots.length === 0 ? (
-                <p className="text-xs text-gray-400">No quedan horarios libres.</p>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {slots.map((h) => (
-                    <button
-                      key={h}
-                      onClick={() => openCrear(h)}
-                      className="rounded-lg border border-gray-200 py-2 text-sm text-gray-700 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-brand-500/10"
-                    >
-                      {h}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Horarios disponibles (por-profesional) o CTA a agendar en "Todos" */}
+            {verTodos ? (
+              <div className="mt-5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => navigate("/agendamiento/crear")}
+                >
+                  Agendar cita
+                </Button>
+                <p className="mt-2 text-center text-[11px] text-gray-400">
+                  Elige un profesional para ver sus horarios libres y agendar desde el calendario.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Horarios disponibles</p>
+                {slots.length === 0 ? (
+                  <p className="text-xs text-gray-400">No quedan horarios libres.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {slots.map((h) => (
+                      <button
+                        key={h}
+                        onClick={() => openCrear(h)}
+                        className="rounded-lg border border-gray-200 py-2 text-sm text-gray-700 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-brand-500/10"
+                      >
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       </div>
+      )}
+
+      {/* ── VISTA DÍA (timeline por horas) ── */}
+      {vista === "dia" && (
+        <Card>
+          {/* Cabecera del día: navegación + volver al mes */}
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Button size="icon" variant="outline" aria-label="Día anterior" onClick={() => shiftDay(-1)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+              </Button>
+              <h2 className="text-lg font-semibold capitalize text-gray-800 dark:text-white/90">{selectedLegible}</h2>
+              <Button size="icon" variant="outline" aria-label="Día siguiente" onClick={() => shiftDay(1)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{citasDia.length} {citasDia.length === 1 ? "cita" : "citas"}</span>
+              <Button size="sm" variant="outline" onClick={() => setVista("mes")}>Volver al mes</Button>
+            </div>
+          </div>
+
+          {/* Día no laboral: aviso */}
+          {!agendaStore.esDiaLaboral(selected) && (
+            <p className="mb-4 rounded-xl border border-dashed border-gray-200 py-3 text-center text-xs text-gray-400 dark:border-gray-700">
+              Día no laboral según la configuración del calendario.
+            </p>
+          )}
+
+          {/* Timeline por horas */}
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {franjas.map((hora) => {
+              const citas = citasPorFranja(hora);
+              return (
+                <div key={hora} className="flex gap-4 py-2.5">
+                  {/* Etiqueta de hora */}
+                  <div className="w-14 shrink-0 pt-1 text-sm font-medium text-gray-400">{hora}</div>
+                  {/* Contenido de la franja */}
+                  <div className="min-w-0 flex-1">
+                    {citas.length === 0 ? (
+                      verTodos ? (
+                        <div className="h-9 rounded-lg border border-dashed border-gray-100 dark:border-gray-800/60" />
+                      ) : (
+                        <button
+                          onClick={() => openCrear(hora)}
+                          className="flex h-9 w-full items-center rounded-lg border border-dashed border-gray-200 px-3 text-xs text-gray-400 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600 dark:border-gray-700 dark:hover:bg-brand-500/10"
+                        >
+                          + Agendar a las {hora}
+                        </button>
+                      )
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {citas.map((c) => <CitaBloque key={c.id} cita={c} onOpen={() => navigate(`/agendamiento/detalles?id=${c.id}`)} />)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Modal crear cita en el slot */}
       <Modal isOpen={crearOpen} onClose={() => setCrearOpen(false)} className="max-w-[480px] p-6">
         <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Agendar cita</h4>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 capitalize">{selectedLegible} · {slotHora}</p>
 
-        {/* Profesional del calendario (fijo) */}
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
-          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${prof.color}`}>{prof.avatar}</span>
-          <div>
-            <p className="text-sm font-medium text-gray-800 dark:text-white/90">{prof.nombre}</p>
-            <p className="text-xs text-gray-400">{prof.especialidad}</p>
+        {/* Profesional del calendario (fijo) — el modal solo se abre con un profesional concreto */}
+        {prof && (
+          <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+            <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">{prof.nombre}</p>
+              <p className="text-xs text-gray-400">{prof.especialidad}</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-4">
           <div>
@@ -341,64 +487,6 @@ export const CalendarioPage = observer(() => {
         </div>
       </Modal>
 
-      {/* Modal configuración del calendario */}
-      <Modal isOpen={configOpen} onClose={() => setConfigOpen(false)} className="max-w-[480px] p-6">
-        <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Configurar calendario</h4>
-        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Define tus días laborales y tu horario disponible.</p>
-        <div className="space-y-5">
-          {/* Días laborales */}
-          <div>
-            <Label htmlFor="cfg-dias">Días que trabajas</Label>
-            <div className="flex flex-wrap gap-2">
-              {DIA_OPTS.map(({ d, label }) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => toggleDia(d)}
-                  className={
-                    "h-10 w-12 rounded-lg border text-sm font-medium transition-colors " +
-                    (cfgDias.includes(d)
-                      ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
-                      : "border-gray-300 text-gray-500 hover:border-brand-300 dark:border-gray-700 dark:text-gray-400")
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Horario */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="cfg-inicio">Hora de inicio</Label>
-              <Select defaultValue={cfgInicio} onChange={setCfgInicio} options={HORA_OPTS} />
-            </div>
-            <div>
-              <Label htmlFor="cfg-fin">Hora de fin</Label>
-              <Select defaultValue={cfgFin} onChange={setCfgFin} options={HORA_OPTS} />
-            </div>
-          </div>
-
-          {/* Duración de cada turno */}
-          <div>
-            <Label htmlFor="cfg-slot">Duración de cada espacio</Label>
-            <Select
-              defaultValue={cfgSlot}
-              onChange={setCfgSlot}
-              options={[{ value: "30", label: "30 minutos" }, { value: "60", label: "1 hora" }]}
-            />
-          </div>
-
-          {Number(cfgFin) <= Number(cfgInicio) && (
-            <p className="text-xs text-error-500">La hora de fin debe ser mayor que la de inicio.</p>
-          )}
-        </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <Button size="sm" variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
-          <Button size="sm" disabled={Number(cfgFin) <= Number(cfgInicio) || cfgDias.length === 0} onClick={guardarConfig}>Guardar</Button>
-        </div>
-      </Modal>
     </>
   );
 });

@@ -7,9 +7,39 @@ import { Button } from "@/elements/ui/button";
 import { Modal } from "@/elements/ui/modal";
 import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
-import { agendaStore, type Profesional } from "@/stores";
+import { Select } from "@/elements/form/select";
+import { agendaStore, type Profesional, type CalendarConfig } from "@/stores";
 
 const RequiredMark = () => <span className="text-error-500">*</span>;
+
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+// Opciones fijas de negocio para el editor de disponibilidad.
+const DIA_OPTS = [
+  { d: 1, label: "Lun" }, { d: 2, label: "Mar" }, { d: 3, label: "Mié" },
+  { d: 4, label: "Jue" }, { d: 5, label: "Vie" }, { d: 6, label: "Sáb" }, { d: 0, label: "Dom" },
+];
+const HORA_OPTS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }));
+// Orden Lun→Dom para mostrar el resumen de días.
+const DIA_ABBR: Record<number, string> = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb", 0: "Dom" };
+const DIA_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** Resumen compacto de la disponibilidad de un profesional (una línea). */
+const resumenDisponibilidad = (cfg: CalendarConfig): string => {
+  const dias = DIA_ORDER.filter((d) => cfg.diasLaborales.includes(d));
+  let diasTxt: string;
+  if (dias.length === 0) diasTxt = "Sin días";
+  else if (dias.length === 7) diasTxt = "Todos los días";
+  // Lun–Vie contiguo
+  else if (dias.length === 5 && [1, 2, 3, 4, 5].every((d) => cfg.diasLaborales.includes(d))) diasTxt = "Lun–Vie";
+  else diasTxt = dias.map((d) => DIA_ABBR[d]).join(", ");
+  const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
+  return `${diasTxt} · ${hh(cfg.horaInicio)}–${hh(cfg.horaFin)} · bloques de ${cfg.duracionSlot}min`;
+};
 
 const EditIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
@@ -44,7 +74,34 @@ export const ProfesionalesPage = observer(() => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Editor de disponibilidad (por profesional).
+  const [dispId, setDispId] = useState<string | null>(null);
+  const [cfgDias, setCfgDias] = useState<number[]>([]);
+  const [cfgInicio, setCfgInicio] = useState("9");
+  const [cfgFin, setCfgFin] = useState("18");
+  const [cfgSlot, setCfgSlot] = useState("60");
+
+  const openDisp = (p: Profesional) => {
+    setDispId(p.id);
+    setCfgDias([...p.config.diasLaborales]);
+    setCfgInicio(String(p.config.horaInicio));
+    setCfgFin(String(p.config.horaFin));
+    setCfgSlot(String(p.config.duracionSlot));
+  };
+  const toggleDia = (d: number) => setCfgDias((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
+  const guardarDisp = () => {
+    if (!dispId) return;
+    agendaStore.updateProfesionalConfig(dispId, {
+      diasLaborales: cfgDias,
+      horaInicio: Number(cfgInicio),
+      horaFin: Number(cfgFin),
+      duracionSlot: Number(cfgSlot),
+    });
+    setDispId(null);
+  };
+
   const profesionales = agendaStore.profesionales;
+  const dispProf = profesionales.find((p) => p.id === dispId);
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm(colores[profesionales.length % colores.length])); setErrors({}); setModalOpen(true); };
   const openEdit = (p: Profesional) => { setEditingId(p.id); setForm({ nombre: p.nombre, especialidad: p.especialidad, color: p.color }); setErrors({}); setModalOpen(true); };
@@ -122,8 +179,15 @@ export const ProfesionalesPage = observer(() => {
                   </div>
                 </div>
 
+                {/* Resumen de disponibilidad */}
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-gray-400"><ClockIcon /></span>
+                  {resumenDisponibilidad(p.config)}
+                </p>
+
                 <div className="mt-4 flex items-center gap-2">
                   <Button size="sm" className="flex-1" onClick={() => navigate(`/agendamiento?prof=${p.id}`)}>Ver agenda</Button>
+                  <Button size="icon" variant="outline" aria-label="Disponibilidad" onClick={() => openDisp(p)}><ClockIcon /></Button>
                   <Button size="icon" variant="outline" aria-label="Editar" onClick={() => openEdit(p)}><EditIcon /></Button>
                   <Button size="icon" variant="outline" aria-label="Eliminar" onClick={() => setDeleteId(p.id)}>
                     <span className="text-error-500"><TrashIcon /></span>
@@ -179,6 +243,67 @@ export const ProfesionalesPage = observer(() => {
         <div className="mt-6 flex justify-end gap-3">
           <Button size="sm" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
           <Button size="sm" onClick={save}>{editingId ? "Guardar" : "Agregar"}</Button>
+        </div>
+      </Modal>
+
+      {/* Modal disponibilidad del profesional */}
+      <Modal isOpen={!!dispId} onClose={() => setDispId(null)} className="max-w-[480px] p-6">
+        <h4 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+          Disponibilidad{dispProf ? ` de ${dispProf.nombre}` : ""}
+        </h4>
+        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Define los días que trabaja y su horario. El calendario y las citas respetan esta configuración.</p>
+        <div className="space-y-5">
+          {/* Días laborales */}
+          <div>
+            <Label htmlFor="disp-dias">Días que trabaja</Label>
+            <div className="flex flex-wrap gap-2">
+              {DIA_OPTS.map(({ d, label }) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDia(d)}
+                  className={
+                    "h-10 w-12 rounded-lg border text-sm font-medium transition-colors " +
+                    (cfgDias.includes(d)
+                      ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                      : "border-gray-300 text-gray-500 hover:border-brand-300 dark:border-gray-700 dark:text-gray-400")
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Horario */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="disp-inicio">Hora de inicio</Label>
+              <Select defaultValue={cfgInicio} onChange={setCfgInicio} options={HORA_OPTS} />
+            </div>
+            <div>
+              <Label htmlFor="disp-fin">Hora de fin</Label>
+              <Select defaultValue={cfgFin} onChange={setCfgFin} options={HORA_OPTS} />
+            </div>
+          </div>
+
+          {/* Duración de cada bloque */}
+          <div>
+            <Label htmlFor="disp-slot">Duración de cada espacio</Label>
+            <Select
+              defaultValue={cfgSlot}
+              onChange={setCfgSlot}
+              options={[{ value: "30", label: "30 minutos" }, { value: "60", label: "1 hora" }]}
+            />
+          </div>
+
+          {Number(cfgFin) <= Number(cfgInicio) && (
+            <p className="text-xs text-error-500">La hora de fin debe ser mayor que la de inicio.</p>
+          )}
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setDispId(null)}>Cancelar</Button>
+          <Button size="sm" disabled={Number(cfgFin) <= Number(cfgInicio) || cfgDias.length === 0} onClick={guardarDisp}>Guardar</Button>
         </div>
       </Modal>
 

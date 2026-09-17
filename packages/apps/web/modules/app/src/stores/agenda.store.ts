@@ -13,6 +13,8 @@ export interface Profesional {
   especialidad: string;
   color: string;      // tailwind bg class
   avatar: string;     // initials
+  /** Disponibilidad del profesional: sus días laborales, horario y duración de slot. */
+  config: CalendarConfig;
 }
 
 export interface Cita {
@@ -102,10 +104,21 @@ export const todayIso = () => iso(new Date());
 // SEED
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Config de disponibilidad por defecto para un profesional nuevo (Lun–Vie, 9–18, slots de 1h). */
+const DEFAULT_CONFIG: CalendarConfig = {
+  diasLaborales: [1, 2, 3, 4, 5],
+  horaInicio: 9,
+  horaFin: 18,
+  duracionSlot: 60,
+};
+
 const PROFESIONALES: Profesional[] = [
-  { id: "p1", nombre: "Dra. Ana Gómez", especialidad: "Psicología", color: "bg-brand-500", avatar: "AG" },
-  { id: "p2", nombre: "Dr. Luis Peña", especialidad: "Nutrición", color: "bg-secondary-500", avatar: "LP" },
-  { id: "p3", nombre: "Lic. María Ruiz", especialidad: "Fisioterapia", color: "bg-accent-500", avatar: "MR" },
+  // Ana: Lun–Vie 9–18, slots de 1h.
+  { id: "p1", nombre: "Dra. Ana Gómez", especialidad: "Psicología", color: "bg-brand-500", avatar: "AG", config: { diasLaborales: [1, 2, 3, 4, 5], horaInicio: 9, horaFin: 18, duracionSlot: 60 } },
+  // Luis: Lun–Sáb 8–14, slots de 30min.
+  { id: "p2", nombre: "Dr. Luis Peña", especialidad: "Nutrición", color: "bg-secondary-500", avatar: "LP", config: { diasLaborales: [1, 2, 3, 4, 5, 6], horaInicio: 8, horaFin: 14, duracionSlot: 30 } },
+  // María: Mar/Jue/Sáb 10–17, slots de 1h.
+  { id: "p3", nombre: "Lic. María Ruiz", especialidad: "Fisioterapia", color: "bg-accent-500", avatar: "MR", config: { diasLaborales: [2, 4, 6], horaInicio: 10, horaFin: 17, duracionSlot: 60 } },
 ];
 
 const seedClientes = (): Cliente[] => [
@@ -148,13 +161,12 @@ class AgendaStore {
   clientes: Cliente[] = seedClientes();
   citas: Cita[] = seedCitas();
 
-  /** Calendar availability config (editable from the calendar settings view). */
-  calendarConfig: CalendarConfig = {
-    diasLaborales: [1, 2, 3, 4, 5], // Lun–Vie
-    horaInicio: 9,
-    horaFin: 18,
-    duracionSlot: 60,
-  };
+  /**
+   * Config de disponibilidad por defecto para cuando no hay un profesional
+   * concreto en contexto (ej. el calendario en modo "Todos"). No es editable;
+   * la disponibilidad real vive en cada Profesional (`profesional.config`).
+   */
+  defaultConfig: CalendarConfig = { ...DEFAULT_CONFIG };
 
   /** Loyalty program config (editable from the analytics view). */
   loyaltyConfig: LoyaltyConfig = {
@@ -171,18 +183,35 @@ class AgendaStore {
     makeAutoObservable(this);
   }
 
-  updateCalendarConfig(data: Partial<CalendarConfig>): void {
-    this.calendarConfig = { ...this.calendarConfig, ...data };
+  /** Actualiza la disponibilidad (config) de un profesional concreto. */
+  updateProfesionalConfig(profId: string, data: Partial<CalendarConfig>): void {
+    const p = this.getProfesional(profId);
+    if (p) p.config = { ...p.config, ...data };
   }
 
   updateLoyaltyConfig(data: Partial<LoyaltyConfig>): void {
     this.loyaltyConfig = { ...this.loyaltyConfig, ...data };
   }
 
-  /** True if the given ISO date falls on a configured working weekday. */
-  esDiaLaboral(fecha: string): boolean {
+  /**
+   * Config de disponibilidad efectiva: la del profesional si se da profId, o la
+   * de respaldo (defaultConfig) cuando no hay profesional concreto (modo "Todos").
+   */
+  configDe(profId?: string): CalendarConfig {
+    if (profId) {
+      const p = this.getProfesional(profId);
+      if (p) return p.config;
+    }
+    return this.defaultConfig;
+  }
+
+  /**
+   * True si la fecha cae en un día laboral. Con profId usa los días del
+   * profesional; sin profId (modo "Todos") usa la config de respaldo.
+   */
+  esDiaLaboral(fecha: string, profId?: string): boolean {
     const dow = new Date(fecha + "T00:00:00").getDay();
-    return this.calendarConfig.diasLaborales.includes(dow);
+    return this.configDe(profId).diasLaborales.includes(dow);
   }
 
   // ── Lookups ──
@@ -219,8 +248,8 @@ class AgendaStore {
    * Returns [] on non-working days.
    */
   horariosDisponibles(fecha: string, profId?: string): string[] {
-    if (!this.esDiaLaboral(fecha)) return [];
-    const { horaInicio, horaFin, duracionSlot } = this.calendarConfig;
+    if (!this.esDiaLaboral(fecha, profId)) return [];
+    const { horaInicio, horaFin, duracionSlot } = this.configDe(profId);
     const ocupadas = new Set(this.citasDelDia(fecha, profId).map((c) => c.hora));
     const slots: string[] = [];
     for (let mins = horaInicio * 60; mins < horaFin * 60; mins += duracionSlot) {
@@ -528,6 +557,7 @@ class AgendaStore {
       especialidad: data.especialidad,
       color,
       avatar: this.inicialesDe(data.nombre),
+      config: { ...DEFAULT_CONFIG },
     };
     this.profesionales.push(prof);
     return prof;

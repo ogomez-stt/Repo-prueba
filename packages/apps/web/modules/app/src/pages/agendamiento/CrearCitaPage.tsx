@@ -46,6 +46,11 @@ export const CrearCitaPage = observer(() => {
   const profOptions = profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` }));
   const profSel = agendaStore.getProfesional(profesionalId);
 
+  // Disponibilidad del profesional elegido para la fecha seleccionada.
+  const esLaboral = agendaStore.esDiaLaboral(fecha, profesionalId);
+  const horariosLibres = agendaStore.horariosDisponibles(fecha, profesionalId);
+  const horaOptions = horariosLibres.map((h) => ({ value: h, label: h }));
+
   const resetForm = () => {
     setCliente(""); setTelefono(""); setServicio(""); setFecha(todayIso());
     setHora("09:00"); setModalidad("presencial"); setNotas(""); setErrors({});
@@ -59,7 +64,9 @@ export const CrearCitaPage = observer(() => {
     else if (phone.length < 7) e.telefono = "Teléfono no válido";
     if (!servicio.trim()) e.servicio = "El servicio es obligatorio";
     if (!fecha) e.fecha = "Elige una fecha";
+    else if (!esLaboral) e.fecha = "El profesional no atiende este día";
     if (!hora) e.hora = "Elige una hora";
+    else if (esLaboral && !horariosLibres.includes(hora)) e.hora = "Ese horario no está disponible";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -167,7 +174,25 @@ export const CrearCitaPage = observer(() => {
               </div>
               <div>
                 <Label htmlFor="hora">Hora <RequiredMark /></Label>
-                <Input id="hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} error={!!errors.hora} hint={errors.hora} />
+                {/* La hora se limita a los horarios libres del profesional según su disponibilidad. */}
+                {!esLaboral ? (
+                  <p className="rounded-lg border border-dashed border-warning-300 bg-warning-50 px-3 py-2.5 text-xs text-warning-700 dark:border-warning-500/40 dark:bg-warning-500/10 dark:text-warning-400">
+                    {profSel ? `${profSel.nombre} no atiende este día.` : "El profesional no atiende este día."} Elige otra fecha.
+                  </p>
+                ) : horaOptions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-xs text-gray-400 dark:border-gray-700">
+                    No quedan horarios libres este día.
+                  </p>
+                ) : (
+                  <Select
+                    key={`${profesionalId}-${fecha}`}
+                    defaultValue={horaOptions.some((o) => o.value === hora) ? hora : ""}
+                    placeholder="Elige una hora"
+                    onChange={setHora}
+                    options={horaOptions}
+                  />
+                )}
+                {errors.hora && <p className="mt-1 text-xs text-error-500">{errors.hora}</p>}
               </div>
             </div>
 
