@@ -551,6 +551,139 @@ class AgendaStore {
     return Math.round(total / recurrentes.length);
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // ANALÍTICA ACOTADA A UN CONJUNTO DE PROFESIONALES (vista del operador)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Paquete de analítica limitado a un conjunto de profesionales: sus citas, los
+   * clientes que atienden esos profesionales, y toda la fidelidad/regularidad y
+   * salud operativa calculada SOLO sobre ese subconjunto. Reutiliza la misma
+   * lógica de tiers/recompensas que la analítica global del admin. Para la vista
+   * del operador, que solo ve lo de SUS profesionales.
+   */
+  analiticaDeProfesionales(profIds: string[]): {
+    citas: Cita[];
+    clientes: Cliente[];
+    fidelidad: ClienteFidelidad[];
+    conteoPorTier: Record<Tier, number>;
+    clientesConRecompensa: ClienteFidelidad[];
+    clientesEnRiesgo: ClienteFidelidad[];
+    totalClientes: number;
+    clientesNuevos: number;
+    tasaRetorno: number;
+    frecuenciaPromedioDias: number;
+    tendenciaSemanal: { semana: string; citas: number }[];
+    modalidadSplit: { presencial: number; virtual: number };
+    ocupacionPorProfesional: { profesional: Profesional; citas: number }[];
+    conteoPorEstado: Record<CitaEstado, number>;
+    totalCitasRegistradas: number;
+    tasaCompletadas: number;
+    tasaCancelacion: number;
+    tasaInasistencia: number;
+    tendenciaOperativa: { semana: string; completadas: number; canceladas: number; noshow: number }[];
+  } {
+    const set = new Set(profIds);
+    const citas = this.citas.filter((c) => set.has(c.profesionalId));
+    // Clientes que tienen al menos una cita con esos profesionales.
+    const clienteIds = new Set(citas.map((c) => c.clienteId));
+    const clientes = this.clientes.filter((c) => clienteIds.has(c.id));
+
+    // Fidelidad de esos clientes (misma lógica que la global).
+    const fidelidad: ClienteFidelidad[] = clientes.map((cliente) => {
+      const tier = this.tierDeCliente(cliente);
+      const antiguedadDias = Math.floor((Date.now() - new Date(cliente.desde + "T00:00:00").getTime()) / 86400000);
+      return {
+        cliente,
+        tier,
+        cumplimiento: this.cumplimientoDe(cliente),
+        antiguedadDias,
+        recompensa: this.recompensaDe(cliente, tier),
+        motivoRiesgo: this.motivoRiesgoDe(cliente),
+      };
+    });
+
+    const conteoPorTier: Record<Tier, number> = { oro: 0, plata: 0, bronce: 0, riesgo: 0 };
+    for (const f of fidelidad) conteoPorTier[f.tier]++;
+
+    const clientesConRecompensa = fidelidad
+      .filter((f) => f.recompensa && f.tier !== "riesgo")
+      .sort((a, b) => b.cliente.completadas - a.cliente.completadas);
+    const clientesEnRiesgo = fidelidad.filter((f) => f.tier === "riesgo");
+
+    // KPIs de clientes.
+    const limite = dayOffset(-30);
+    const clientesNuevos = clientes.filter((c) => c.desde >= limite).length;
+    const recurrentes = clientes.filter((c) => c.totalCitas > 1);
+    const tasaRetorno = clientes.length === 0 ? 0 : Math.round((recurrentes.length / clientes.length) * 100);
+    const frecuenciaPromedioDias = recurrentes.length === 0 ? 0 : Math.round(
+      recurrentes.reduce((s, c) => {
+        const antiguedad = Math.floor((Date.now() - new Date(c.desde + "T00:00:00").getTime()) / 86400000);
+        return s + antiguedad / c.totalCitas;
+      }, 0) / recurrentes.length,
+    );
+
+    // Gráficos (sobre las citas del subconjunto).
+    const activas = citas.filter((c) => c.estado !== "cancelada");
+    const modalidadSplit = {
+      presencial: activas.filter((c) => c.modalidad === "presencial").length,
+      virtual: activas.filter((c) => c.modalidad === "virtual").length,
+    };
+    const ocupacionPorProfesional = this.profesionales
+      .filter((p) => set.has(p.id))
+      .map((p) => ({ profesional: p, citas: citas.filter((c) => c.profesionalId === p.id && c.estado !== "cancelada").length }));
+
+    // Tendencia semanal (citas) y operativa (por estado), sobre el subconjunto.
+    const now = new Date();
+    const bucket = () => [0, 0, 0, 0];
+    const semanaDe = (c: Cita): number => {
+      const d = new Date(c.fecha + "T00:00:00");
+      const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+      if (diffDays < 0 || diffDays > 27) return -1;
+      return 3 - Math.floor(diffDays / 7);
+    };
+    const semTotal = bucket(), semComp = bucket(), semCanc = bucket(), semNo = bucket();
+    for (const c of citas) {
+      const wk = semanaDe(c);
+      if (wk < 0 || wk >= 4) continue;
+      semTotal[wk]++;
+      if (c.estado === "completada") semComp[wk]++;
+      else if (c.estado === "cancelada") semCanc[wk]++;
+      else if (c.estado === "noshow") semNo[wk]++;
+    }
+    const labels = ["-3 sem", "-2 sem", "-1 sem", "Esta sem"];
+    const tendenciaSemanal = labels.map((semana, i) => ({ semana, citas: semTotal[i] }));
+    const tendenciaOperativa = labels.map((semana, i) => ({ semana, completadas: semComp[i], canceladas: semCanc[i], noshow: semNo[i] }));
+
+    // Salud operativa (estados) del subconjunto.
+    const conteoPorEstado: Record<CitaEstado, number> = { pendiente: 0, confirmada: 0, completada: 0, cancelada: 0, noshow: 0 };
+    for (const c of citas) conteoPorEstado[c.estado]++;
+    const totalCitasRegistradas = citas.length;
+    const pct = (n: number) => (totalCitasRegistradas === 0 ? 0 : Math.round((n / totalCitasRegistradas) * 100));
+
+    return {
+      citas,
+      clientes,
+      fidelidad,
+      conteoPorTier,
+      clientesConRecompensa,
+      clientesEnRiesgo,
+      totalClientes: clientes.length,
+      clientesNuevos,
+      tasaRetorno,
+      frecuenciaPromedioDias,
+      tendenciaSemanal,
+      modalidadSplit,
+      ocupacionPorProfesional,
+      conteoPorEstado,
+      totalCitasRegistradas,
+      tasaCompletadas: pct(conteoPorEstado.completada),
+      tasaCancelacion: pct(conteoPorEstado.cancelada),
+      tasaInasistencia: pct(conteoPorEstado.noshow),
+      tendenciaOperativa,
+    };
+  }
+
   // ── Tier display helpers ──
   tierLabel(t: Tier): string {
     return { oro: "Oro", plata: "Plata", bronce: "Bronce", riesgo: "En riesgo" }[t];

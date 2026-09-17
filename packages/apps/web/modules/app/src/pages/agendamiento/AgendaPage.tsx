@@ -109,11 +109,15 @@ export const AgendaPage = observer(() => {
   const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
   const idsVisibles = new Set(profesionalesVisibles.map((p) => p.id));
 
-  // Alcance actual: "Todos" por defecto, o un profesional concreto del ?prof=
-  // (si es visible). "Todos" respeta permisos = todos los profesionales visibles.
+  // ¿Hay opción "Todos"? Solo si el usuario ve más de un profesional. Con uno
+  // solo, la agenda va directo a ese profesional (sin "Todos").
+  const soloUno = profesionalesVisibles.length === 1;
+  // Alcance actual: con un solo profesional, ese; si no, "Todos" por defecto o
+  // el ?prof= si es válido.
   const profParam = searchParams.get("prof");
-  const profId =
-    profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
+  const profId = soloUno
+    ? profesionalesVisibles[0].id
+    : profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
       ? profParam
       : TODOS;
   const verTodos = profId === TODOS;
@@ -143,7 +147,8 @@ export const AgendaPage = observer(() => {
     : agendaStore.citasDeProfesional(profId).length;
 
   const profOptions = [
-    { value: TODOS, label: "Todos los profesionales" },
+    // "Todos" solo cuando hay más de un profesional visible.
+    ...(soloUno ? [] : [{ value: TODOS, label: "Todos los profesionales" }]),
     ...profesionalesVisibles.map((p) => ({ value: p.id, label: `${p.nombre} — ${p.especialidad}` })),
   ];
   const estadoOptions = [
@@ -178,8 +183,8 @@ export const AgendaPage = observer(() => {
         description="Agenda de citas"
       />
 
-      {/* Volver a todos — solo cuando se ve un profesional concreto */}
-      {!verTodos && (
+      {/* Volver a todos — solo cuando se ve un profesional concreto y hay varios */}
+      {!verTodos && !soloUno && (
         <div className="mb-4">
           <Link to="/agendamiento" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
@@ -237,9 +242,12 @@ export const AgendaPage = observer(() => {
 
       {/* Alcance (profesional / todos) + filtro de estado */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <div className="sm:w-72">
-          <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento?prof=${v}`)} options={profOptions} />
-        </div>
+        {/* Selector de profesional — solo si el usuario ve más de uno */}
+        {!soloUno && (
+          <div className="sm:w-72">
+            <Select defaultValue={profId} onChange={(v) => navigate(`/agendamiento?prof=${v}`)} options={profOptions} />
+          </div>
+        )}
         <div className="sm:w-56"><Select defaultValue={estadoFilter} onChange={(v) => setEstadoFilter(v as CitaEstado | "all")} options={estadoOptions} /></div>
       </div>
 

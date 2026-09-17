@@ -72,11 +72,25 @@ export const CalendarioPage = observer(() => {
 
   // Profesionales visibles (en simulación de operador, solo los suyos).
   const profesionalesVisibles = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
+  const idsVisibles = new Set(profesionalesVisibles.map((p) => p.id));
+  // En "Todos", el operador solo ve las citas de SUS profesionales (el admin ve todas).
+  const enScope = (profId: string) => sessionStore.puedeVerProfesional(profId);
+  // Conteo de citas de un día respetando el alcance: un profesional concreto, o
+  // (en "Todos") solo los profesionales visibles del usuario.
+  const countByDayScope = (iso: string): number =>
+    verTodos
+      ? agendaStore.citasDelDia(iso).filter((c) => enScope(c.profesionalId)).length
+      : agendaStore.countByDay(iso, profScope);
 
-  // Alcance actual: "Todos" por defecto, o un profesional concreto del ?prof=.
+  // ¿Hay opción "Todos"? Solo si el usuario ve más de un profesional. Con uno
+  // solo, el calendario va directo a ese profesional (sin "Todos").
+  const soloUno = profesionalesVisibles.length === 1;
+  // Alcance actual: con un solo profesional, ese; si no, "Todos" por defecto o
+  // el ?prof= si es válido.
   const profParam = searchParams.get("prof");
-  const profId =
-    profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
+  const profId = soloUno
+    ? profesionalesVisibles[0].id
+    : profParam && profParam !== TODOS && sessionStore.puedeVerProfesional(profParam)
       ? profParam
       : TODOS;
   const verTodos = profId === TODOS;
@@ -110,7 +124,11 @@ export const CalendarioPage = observer(() => {
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
   const goToday = () => { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelected(todayIso()); };
 
-  const citasDia = agendaStore.citasDelDia(selected, profScope);
+  // Citas del día: de un profesional concreto, o (en "Todos") solo las de los
+  // profesionales visibles para el usuario (admin = todos; operador = los suyos).
+  const citasDia = verTodos
+    ? agendaStore.citasDelDia(selected).filter((c) => enScope(c.profesionalId))
+    : agendaStore.citasDelDia(selected, profScope);
   // Los horarios libres son por-profesional; en "Todos" no aplican.
   const slots = verTodos ? [] : agendaStore.horariosDisponibles(selected, profScope);
   const selectedLegible = new Date(selected + "T00:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
@@ -200,8 +218,8 @@ export const CalendarioPage = observer(() => {
     <>
       <PageMeta title={verTodos ? "Calendario" : `Calendario de ${prof?.nombre ?? ""}`} description="Vista mensual de citas" />
 
-      {/* Volver a todos — solo cuando se ve un profesional concreto */}
-      {!verTodos && (
+      {/* Volver a todos — solo cuando se ve un profesional concreto y hay varios */}
+      {!verTodos && !soloUno && (
         <div className="mb-4">
           <Link to="/agendamiento/calendario" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
@@ -236,16 +254,19 @@ export const CalendarioPage = observer(() => {
             activeTab={vista}
             onTabChange={(k) => setVista(k as "mes" | "dia")}
           />
-          <div className="sm:w-56">
-            <Select
-              defaultValue={profId}
-              onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)}
-              options={[
-                { value: TODOS, label: "Todos los profesionales" },
-                ...profesionalesVisibles.map((p) => ({ value: p.id, label: p.nombre })),
-              ]}
-            />
-          </div>
+          {/* Selector de profesional — solo si el usuario ve más de uno */}
+          {!soloUno && (
+            <div className="sm:w-56">
+              <Select
+                defaultValue={profId}
+                onChange={(v) => navigate(`/agendamiento/calendario?prof=${v}`)}
+                options={[
+                  { value: TODOS, label: "Todos los profesionales" },
+                  ...profesionalesVisibles.map((p) => ({ value: p.id, label: p.nombre })),
+                ]}
+              />
+            </div>
+          )}
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={goToday}>Hoy</Button>
           </div>
@@ -282,7 +303,7 @@ export const CalendarioPage = observer(() => {
               {cells.map((d, i) => {
                 if (d === null) return <div key={i} />;
                 const iso = isoOf(year, month, d);
-                const count = agendaStore.countByDay(iso, profScope);
+                const count = countByDayScope(iso);
                 const isToday = iso === todayIso();
                 const isSelected = iso === selected;
                 const laboral = agendaStore.esDiaLaboral(iso, profScope);

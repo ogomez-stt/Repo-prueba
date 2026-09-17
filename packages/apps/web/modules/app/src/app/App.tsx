@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router";
 import { observer } from "mobx-react-lite";
 import { queuesStore, sessionStore } from "@/stores";
 import { AppShell } from "@/app/AppShell";
-import { DashboardPage, DashboardAgendamientoPage, OperadorInicioTurnos } from "@/pages/dashboard";
+import { DashboardPage, DashboardAgendamientoPage, OperadorInicioTurnos, OperadorInicioAgenda, OperadorAnaliticaAgenda } from "@/pages/dashboard";
 import { TurnosPage } from "@/pages/turnos";
 import { ColasPage } from "@/pages/colas";
 import { RecepcionPage } from "@/pages/recepcion";
@@ -104,6 +104,28 @@ const InicioTurnos = observer(() => {
 });
 
 /**
+ * InicioAgendamiento — decide qué "Inicio" mostrar en /agendamiento/inicio:
+ * - Operador simulado en Agendamiento → su inicio personal (OperadorInicioAgenda).
+ * - Cualquier otro caso (admin) → el dashboard global (DashboardAgendamientoPage).
+ */
+const InicioAgendamiento = observer(() => {
+  const op = sessionStore.operadorSimulado;
+  if (op && op.modulo === "agendamiento") return <OperadorInicioAgenda />;
+  return <DashboardAgendamientoPage />;
+});
+
+/**
+ * Analitica — decide qué "Analítica" mostrar en /agendamiento/analitica:
+ * - Operador simulado en Agendamiento → analítica acotada a SUS profesionales.
+ * - Cualquier otro caso (admin) → la analítica global del negocio.
+ */
+const Analitica = observer(() => {
+  const op = sessionStore.operadorSimulado;
+  if (op && op.modulo === "agendamiento") return <OperadorAnaliticaAgenda />;
+  return <AnaliticaPage />;
+});
+
+/**
  * Encuestas — decide qué vista mostrar en /encuestas:
  * - Operador simulado → solo el apartado para compartir el link (EncuestaCompartir).
  * - Admin → la vista completa con estadísticas y configuración (EncuestasPage).
@@ -133,13 +155,13 @@ export default function App() {
         <Route path="/colas" element={<SeccionGuard seccion="colas"><ColasPage /></SeccionGuard>} />
         <Route path="/encuestas" element={<SeccionGuard seccion="encuestas"><Encuestas /></SeccionGuard>} />
         {/* Agendamiento — protegidas por SeccionGuard en modo simulación */}
-        <Route path="/agendamiento/inicio" element={<SeccionGuard seccion="inicio"><DashboardAgendamientoPage /></SeccionGuard>} />
+        <Route path="/agendamiento/inicio" element={<SeccionGuard seccion="inicio"><InicioAgendamiento /></SeccionGuard>} />
         <Route path="/agendamiento" element={<SeccionGuard seccion="agenda"><AgendaPage /></SeccionGuard>} />
         <Route path="/agendamiento/profesionales" element={<SeccionGuard seccion="profesionales"><ProfesionalesPage /></SeccionGuard>} />
         <Route path="/agendamiento/calendario" element={<SeccionGuard seccion="calendario"><CalendarioPage /></SeccionGuard>} />
         <Route path="/agendamiento/detalles" element={<SeccionGuard seccion="agenda"><CitaDetallePage /></SeccionGuard>} />
         <Route path="/agendamiento/crear" element={<SeccionGuard seccion="crear"><CrearCitaPage /></SeccionGuard>} />
-        <Route path="/agendamiento/analitica" element={<SeccionGuard seccion="analitica"><AnaliticaPage /></SeccionGuard>} />
+        <Route path="/agendamiento/analitica" element={<SeccionGuard seccion="analitica"><Analitica /></SeccionGuard>} />
         {/* Solo admin — un operador simulado nunca tiene esta "sección", así que
             SeccionGuard muestra el aviso de sin acceso si intenta entrar por URL */}
         <Route path="/turnos/operadores" element={<SeccionGuard seccion="__solo_admin__"><OperadoresTurnosPage /></SeccionGuard>} />

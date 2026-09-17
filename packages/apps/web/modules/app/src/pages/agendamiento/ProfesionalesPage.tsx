@@ -8,7 +8,7 @@ import { Modal } from "@/elements/ui/modal";
 import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { Select } from "@/elements/form/select";
-import { agendaStore, type Profesional, type CalendarConfig } from "@/stores";
+import { agendaStore, sessionStore, type Profesional, type CalendarConfig } from "@/stores";
 
 const RequiredMark = () => <span className="text-error-500">*</span>;
 
@@ -100,7 +100,9 @@ export const ProfesionalesPage = observer(() => {
     setDispId(null);
   };
 
-  const profesionales = agendaStore.profesionales;
+  // El admin ve todos; el operador (simulación) solo sus profesionales asignados.
+  const esAdmin = sessionStore.isAdmin;
+  const profesionales = agendaStore.profesionales.filter((p) => sessionStore.puedeVerProfesional(p.id));
   const dispProf = profesionales.find((p) => p.id === dispId);
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm(colores[profesionales.length % colores.length])); setErrors({}); setModalOpen(true); };
@@ -138,7 +140,7 @@ export const ProfesionalesPage = observer(() => {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Profesionales</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Cada profesional tiene su propia agenda de citas</p>
         </div>
-        <Button size="sm" onClick={openCreate}>+ Agregar profesional</Button>
+        {esAdmin && <Button size="sm" onClick={openCreate}>+ Agregar profesional</Button>}
       </div>
 
       {/* Grid o estado vacío */}
@@ -149,9 +151,15 @@ export const ProfesionalesPage = observer(() => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Aún no tienes profesionales</h3>
-          <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">Crea el primero para empezar a gestionar su agenda de citas.</p>
-          <Button size="sm" className="mt-5" onClick={openCreate}>Agregar profesional</Button>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            {esAdmin ? "Aún no tienes profesionales" : "No tienes profesionales asignados"}
+          </h3>
+          <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+            {esAdmin
+              ? "Crea el primero para empezar a gestionar su agenda de citas."
+              : "El administrador aún no te ha asignado ningún profesional."}
+          </p>
+          {esAdmin && <Button size="sm" className="mt-5" onClick={openCreate}>Agregar profesional</Button>}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -187,11 +195,16 @@ export const ProfesionalesPage = observer(() => {
 
                 <div className="mt-4 flex items-center gap-2">
                   <Button size="sm" className="flex-1" onClick={() => navigate(`/agendamiento?prof=${p.id}`)}>Ver agenda</Button>
-                  <Button size="icon" variant="outline" aria-label="Disponibilidad" onClick={() => openDisp(p)}><ClockIcon /></Button>
-                  <Button size="icon" variant="outline" aria-label="Editar" onClick={() => openEdit(p)}><EditIcon /></Button>
-                  <Button size="icon" variant="outline" aria-label="Eliminar" onClick={() => setDeleteId(p.id)}>
-                    <span className="text-error-500"><TrashIcon /></span>
-                  </Button>
+                  {/* Acciones de gestión: solo el administrador */}
+                  {esAdmin && (
+                    <>
+                      <Button size="icon" variant="outline" aria-label="Disponibilidad" onClick={() => openDisp(p)}><ClockIcon /></Button>
+                      <Button size="icon" variant="outline" aria-label="Editar" onClick={() => openEdit(p)}><EditIcon /></Button>
+                      <Button size="icon" variant="outline" aria-label="Eliminar" onClick={() => setDeleteId(p.id)}>
+                        <span className="text-error-500"><TrashIcon /></span>
+                      </Button>
+                    </>
+                  )}
                 </div>
               </Card>
             );
