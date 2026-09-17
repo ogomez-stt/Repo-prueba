@@ -27,26 +27,35 @@ const TODOS = "all";
  * Muestra cliente, servicio, estado y (para distinguir en "Todos") el avatar y
  * nombre del profesional con su color.
  */
-const CitaBloque = observer(({ cita, onOpen }: { cita: Cita; onOpen: () => void }) => {
+const CitaBloque = observer(({ cita, onOpen, fill }: { cita: Cita; onOpen: () => void; fill?: boolean }) => {
   const prof = agendaStore.getProfesional(cita.profesionalId);
+  // Barra lateral con el color del profesional para reforzar la identidad.
   return (
     <div
       onClick={onOpen}
       role="button"
       tabIndex={0}
-      className="cursor-pointer rounded-lg border border-gray-200 p-3 transition-colors hover:border-brand-300 dark:border-gray-800"
+      className={
+        "flex cursor-pointer gap-2.5 overflow-hidden rounded-lg border border-gray-200 pr-3 transition-colors hover:border-brand-300 dark:border-gray-800 " +
+        (fill ? "h-full" : "")
+      }
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{cita.cliente}</p>
-        <Badge size="xs" color={agendaStore.estadoBadgeColor(cita.estado)}>{agendaStore.estadoLabel(cita.estado)}</Badge>
-      </div>
-      <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{cita.servicio}</p>
-      {prof && (
-        <div className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white ${prof.color}`}>{prof.avatar}</span>
-          {prof.nombre}
+      {prof && <span className={`w-1.5 shrink-0 ${prof.color}`} />}
+      <div className="min-w-0 flex-1 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{cita.cliente}</p>
+          <Badge size="xs" color={agendaStore.estadoBadgeColor(cita.estado)}>{agendaStore.estadoLabel(cita.estado)}</Badge>
         </div>
-      )}
+        <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+          {cita.servicio}{cita.duracion ? ` · ${cita.duracion} min` : ""}
+        </p>
+        {prof && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white ${prof.color}`}>{prof.avatar}</span>
+            {prof.nombre}
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -106,17 +115,39 @@ export const CalendarioPage = observer(() => {
   const slots = verTodos ? [] : agendaStore.horariosDisponibles(selected, profScope);
   const selectedLegible = new Date(selected + "T00:00:00").toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
 
-  // ── Vista de día (timeline por horas) ──
-  // Etiquetas de las franjas horarias, según la config del calendario.
+  // ── Vista de día (timeline en franjas fijas de 30 min) ──
+  // El timeline siempre usa franjas de 30 min (independiente de la duración de
+  // slot del profesional), para que las citas a las :30 se vean bien. Una cita
+  // de 60 min ocupa dos franjas: la de inicio + la siguiente (continuación).
+  const FRANJA_MIN = 30;
+  const FRANJA_ALTO = 56; // alto en px de cada franja de 30 min en el timeline
+  const hhmm = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  const toMin = (hora: string) => { const [h, m] = hora.split(":").map(Number); return h * 60 + m; };
+
   const franjas: string[] = [];
   {
-    const { horaInicio, horaFin, duracionSlot } = agendaStore.configDe(profScope);
-    for (let mins = horaInicio * 60; mins < horaFin * 60; mins += duracionSlot) {
-      franjas.push(`${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`);
+    const { horaInicio, horaFin } = agendaStore.configDe(profScope);
+    for (let mins = horaInicio * 60; mins < horaFin * 60; mins += FRANJA_MIN) {
+      franjas.push(hhmm(mins));
     }
   }
-  // Citas del día indexadas por su franja (la cita cae en la franja cuya etiqueta coincide con su hora).
-  const citasPorFranja = (hora: string): Cita[] => citasDia.filter((c) => c.hora === hora);
+
+  /**
+   * Estado de cada franja: la cita que empieza en ella ("start", con cuántas
+   * franjas de 30 min ocupa), una continuación de una cita anterior ("cont", que
+   * no renderiza fila porque el card de inicio la cubre), o nada.
+   */
+  const franjaInfo = (hora: string): { cita: Cita; tipo: "start"; span: number } | { tipo: "cont" } | null => {
+    const mins = toMin(hora);
+    for (const c of citasDia) {
+      const ini = toMin(c.hora);
+      const dur = c.duracion || FRANJA_MIN;
+      const fin = ini + dur;
+      if (mins === ini) return { cita: c, tipo: "start", span: Math.max(1, Math.ceil(dur / FRANJA_MIN)) };
+      if (mins > ini && mins < fin) return { tipo: "cont" };
+    }
+    return null;
+  };
 
   const vistaTabs: TabItem[] = [
     { key: "mes", label: "Mes" },
@@ -262,8 +293,9 @@ export const CalendarioPage = observer(() => {
                   <button
                     key={i}
                     disabled={bloqueado}
-                    onClick={() => { if (!bloqueado) abrirDia(iso); }}
-                    title={bloqueado ? "El profesional no atiende este día" : (count > 0 ? `${count} ${count === 1 ? "cita" : "citas"} · ver día` : "Ver día")}
+                    onClick={() => { if (!bloqueado) setSelected(iso); }}
+                    onDoubleClick={() => { if (!bloqueado) abrirDia(iso); }}
+                    title={bloqueado ? "El profesional no atiende este día" : (count > 0 ? `${count} ${count === 1 ? "cita" : "citas"} · doble clic para ver el día` : "Doble clic para ver el día")}
                     className={
                       "flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border text-sm transition-colors " +
                       (isSelected && !bloqueado
@@ -281,9 +313,9 @@ export const CalendarioPage = observer(() => {
                     }>
                       {d}
                     </span>
-                    {/* Contador de citas — escala con cualquier cantidad */}
+                    {/* Contador de citas — usa el color del profesional cuando hay uno concreto */}
                     {count > 0 && (
-                      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-500 px-1.5 text-[11px] font-semibold leading-4 text-white">
+                      <span className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-4 text-white ${prof ? prof.color : "bg-brand-500"}`}>
                         {count}
                       </span>
                     )}
@@ -297,11 +329,21 @@ export const CalendarioPage = observer(() => {
         {/* Panel del día */}
         <div className="lg:col-span-1">
           <Card>
-            <h3 className="text-sm font-semibold capitalize text-gray-800 dark:text-white/90">{selectedLegible}</h3>
-            <p className="mt-0.5 text-xs text-gray-400">
-              {citasDia.length} {citasDia.length === 1 ? "cita" : "citas"}
-              {!verTodos && ` · ${slots.length} horarios libres`}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold capitalize text-gray-800 dark:text-white/90">{selectedLegible}</h3>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {citasDia.length} {citasDia.length === 1 ? "cita" : "citas"}
+                  {!verTodos && ` · ${slots.length} horarios libres`}
+                </p>
+              </div>
+              <button
+                onClick={() => setVista("dia")}
+                className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+              >
+                Ver día completo
+              </button>
+            </div>
 
             {/* Citas del día */}
             <div className="mt-4 space-y-2">
@@ -390,39 +432,49 @@ export const CalendarioPage = observer(() => {
             </div>
           </div>
 
-          {/* Día no laboral: aviso */}
-          {!agendaStore.esDiaLaboral(selected) && (
+          {/* Día no laboral: aviso (según la disponibilidad del profesional) */}
+          {!verTodos && !agendaStore.esDiaLaboral(selected, profScope) && (
             <p className="mb-4 rounded-xl border border-dashed border-gray-200 py-3 text-center text-xs text-gray-400 dark:border-gray-700">
-              Día no laboral según la configuración del calendario.
+              {prof ? `${prof.nombre} no atiende este día.` : "Día no laboral según la disponibilidad."}
             </p>
           )}
 
-          {/* Timeline por horas */}
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {/* Timeline en franjas de 30 min. Cada franja tiene un alto fijo; una
+              cita que dura varias franjas se dibuja como un card más alto que
+              cubre esas franjas (las de continuación quedan vacías). */}
+          <div>
             {franjas.map((hora) => {
-              const citas = citasPorFranja(hora);
+              const info = franjaInfo(hora);
               return (
-                <div key={hora} className="flex gap-4 py-2.5">
+                <div key={hora} className="flex gap-4" style={{ height: FRANJA_ALTO }}>
                   {/* Etiqueta de hora */}
                   <div className="w-14 shrink-0 pt-1 text-sm font-medium text-gray-400">{hora}</div>
                   {/* Contenido de la franja */}
-                  <div className="min-w-0 flex-1">
-                    {citas.length === 0 ? (
-                      verTodos ? (
-                        <div className="h-9 rounded-lg border border-dashed border-gray-100 dark:border-gray-800/60" />
-                      ) : (
+                  <div className="relative min-w-0 flex-1 border-t border-gray-100 dark:border-gray-800">
+                    {info === null ? (
+                      // Franja libre
+                      verTodos ? null : (
                         <button
                           onClick={() => openCrear(hora)}
-                          className="flex h-9 w-full items-center rounded-lg border border-dashed border-gray-200 px-3 text-xs text-gray-400 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600 dark:border-gray-700 dark:hover:bg-brand-500/10"
+                          className="absolute inset-x-0 top-1 flex items-center rounded-lg border border-dashed border-gray-200 px-3 text-xs text-gray-400 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600 dark:border-gray-700 dark:hover:bg-brand-500/10"
+                          style={{ height: FRANJA_ALTO - 6 }}
                         >
                           + Agendar a las {hora}
                         </button>
                       )
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        {citas.map((c) => <CitaBloque key={c.id} cita={c} onOpen={() => navigate(`/agendamiento/detalles?id=${c.id}`)} />)}
+                    ) : info.tipo === "start" ? (
+                      // Inicio de la cita: card que abarca todas sus franjas
+                      <div
+                        className="absolute inset-x-0 top-1 z-10"
+                        style={{ height: FRANJA_ALTO * info.span - 6 }}
+                      >
+                        <CitaBloque
+                          cita={info.cita}
+                          fill
+                          onOpen={() => navigate(`/agendamiento/detalles?id=${info.cita.id}`)}
+                        />
                       </div>
-                    )}
+                    ) : null /* continuación: la cubre el card de inicio */}
                   </div>
                 </div>
               );

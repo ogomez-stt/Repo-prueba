@@ -48,8 +48,15 @@ export const CrearCitaPage = observer(() => {
 
   // Disponibilidad del profesional elegido para la fecha seleccionada.
   const esLaboral = agendaStore.esDiaLaboral(fecha, profesionalId);
-  const horariosLibres = agendaStore.horariosDisponibles(fecha, profesionalId);
-  const horaOptions = horariosLibres.map((h) => ({ value: h, label: h }));
+  // Todas las franjas del día (libres + ocupadas), para mostrar el día completo.
+  const franjasDia = agendaStore.franjasDelDia(fecha, profesionalId);
+  const horariosLibres = franjasDia.filter((f) => !f.ocupada).map((f) => f.hora);
+  const horaOptions = franjasDia.map((f) => ({
+    value: f.hora,
+    label: f.ocupada ? `${f.hora} — Ocupado` : f.hora,
+  }));
+  // ¿La hora elegida cae en una franja ocupada del profesional?
+  const horaOcupada = !!hora && franjasDia.some((f) => f.hora === hora && f.ocupada);
 
   const resetForm = () => {
     setCliente(""); setTelefono(""); setServicio(""); setFecha(todayIso());
@@ -66,6 +73,7 @@ export const CrearCitaPage = observer(() => {
     if (!fecha) e.fecha = "Elige una fecha";
     else if (!esLaboral) e.fecha = "El profesional no atiende este día";
     if (!hora) e.hora = "Elige una hora";
+    else if (esLaboral && horaOcupada) e.hora = "Ese horario ya está ocupado";
     else if (esLaboral && !horariosLibres.includes(hora)) e.hora = "Ese horario no está disponible";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -174,14 +182,14 @@ export const CrearCitaPage = observer(() => {
               </div>
               <div>
                 <Label htmlFor="hora">Hora <RequiredMark /></Label>
-                {/* La hora se limita a los horarios libres del profesional según su disponibilidad. */}
+                {/* Muestra todas las franjas del profesional; las ocupadas se marcan y avisan. */}
                 {!esLaboral ? (
                   <p className="rounded-lg border border-dashed border-warning-300 bg-warning-50 px-3 py-2.5 text-xs text-warning-700 dark:border-warning-500/40 dark:bg-warning-500/10 dark:text-warning-400">
                     {profSel ? `${profSel.nombre} no atiende este día.` : "El profesional no atiende este día."} Elige otra fecha.
                   </p>
                 ) : horaOptions.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-xs text-gray-400 dark:border-gray-700">
-                    No quedan horarios libres este día.
+                    Este día no tiene horarios configurados.
                   </p>
                 ) : (
                   <Select
@@ -191,6 +199,13 @@ export const CrearCitaPage = observer(() => {
                     onChange={setHora}
                     options={horaOptions}
                   />
+                )}
+                {/* Alerta: el horario elegido ya está ocupado por el profesional. */}
+                {horaOcupada && (
+                  <p className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-error-300 bg-error-50 px-3 py-2 text-xs text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                    {profSel ? `${profSel.nombre} ya tiene una cita a las ${hora}.` : `Ese horario ya está ocupado.`} Elige otra hora.
+                  </p>
                 )}
                 {errors.hora && <p className="mt-1 text-xs text-error-500">{errors.hora}</p>}
               </div>

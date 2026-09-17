@@ -11,6 +11,7 @@ import { Input } from "@/elements/form/input";
 import { Label } from "@/elements/form/label";
 import { LineChart } from "@/elements/ui/line-chart";
 import { PieChart } from "@/elements/ui/pie-chart";
+import { BarChart } from "@/elements/ui/bar-chart";
 import { MetricCard } from "@/compositions/metric-card";
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/elements/ui/table";
 import { GroupIcon, UserCircleIcon, TimeIcon, CalenderIcon } from "@/icons";
@@ -85,6 +86,42 @@ export const AnaliticaPage = observer(() => {
   };
   const modalidadSeries = [modalidad.presencial, modalidad.virtual];
 
+  // ── Distribución de citas por estado (barras horizontales) ──
+  const estados = agendaStore.conteoPorEstado;
+  // Colores semánticos: pendiente(warning) · confirmada(indigo) · completada(success) · cancelada(gris) · no asistió(error)
+  const estadoOptions: ApexOptions = {
+    colors: ["#FDB022", INDIGO, "#12B76A", "#98A2B3", "#F04438"],
+    chart: { fontFamily: "DM Sans, sans-serif", toolbar: { show: false } },
+    plotOptions: { bar: { horizontal: true, borderRadius: 4, borderRadiusApplication: "end", distributed: true, barHeight: "60%" } },
+    dataLabels: { enabled: true },
+    legend: { show: false },
+    xaxis: {
+      categories: ["Pendiente", "Confirmada", "Completada", "Cancelada", "No asistió"],
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    grid: { xaxis: { lines: { show: true } } },
+  };
+  const estadoSeries = [{ name: "Citas", data: [estados.pendiente, estados.confirmada, estados.completada, estados.cancelada, estados.noshow] }];
+
+  // ── Tendencia operativa por semana (línea): completadas / canceladas / no-show ──
+  const opTend = agendaStore.tendenciaOperativa;
+  const tendenciaOpOptions: ApexOptions = {
+    colors: ["#12B76A", "#98A2B3", "#F04438"],
+    chart: { fontFamily: "DM Sans, sans-serif", toolbar: { show: false } },
+    stroke: { curve: "smooth", width: 2 },
+    dataLabels: { enabled: false },
+    markers: { size: 4, strokeWidth: 2, colors: ["#fff"], strokeColors: ["#12B76A", "#98A2B3", "#F04438"] },
+    xaxis: { categories: opTend.map((t) => t.semana), axisBorder: { show: false }, axisTicks: { show: false } },
+    legend: { position: "top", horizontalAlign: "right", fontFamily: "DM Sans" },
+    grid: { yaxis: { lines: { show: true } } },
+  };
+  const tendenciaOpSeries = [
+    { name: "Completadas", data: opTend.map((t) => t.completadas) },
+    { name: "Canceladas", data: opTend.map((t) => t.canceladas) },
+    { name: "Inasistencias", data: opTend.map((t) => t.noshow) },
+  ];
+
   const tierCard = (t: Tier, help: string) => (
     <Card className="rounded-2xl">
       <div className="flex items-center gap-2">
@@ -128,6 +165,23 @@ export const AnaliticaPage = observer(() => {
           <CardTitle>Modalidad</CardTitle>
           <div className="mt-4"><PieChart series={modalidadSeries} options={modalidadOptions} height={260} /></div>
         </Card>
+      </div>
+
+      {/* ── SALUD OPERATIVA DE LAS CITAS ── */}
+      <div className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90">Estado de las citas</h2>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Distribución por estado (barras) */}
+          <Card>
+            <CardTitle>Distribución por estado</CardTitle>
+            <div className="mt-4"><BarChart series={estadoSeries} options={estadoOptions} height={280} /></div>
+          </Card>
+          {/* Tendencia operativa (línea) */}
+          <Card>
+            <CardTitle>Evolución: completadas · canceladas · inasistencias</CardTitle>
+            <div className="mt-4"><LineChart series={tendenciaOpSeries} options={tendenciaOpOptions} height={280} /></div>
+          </Card>
+        </div>
       </div>
 
       {/* ── PROGRAMA DE FIDELIDAD ── */}

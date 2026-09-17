@@ -261,6 +261,26 @@ class AgendaStore {
     return slots;
   }
 
+  /**
+   * Todas las franjas del día para un profesional (según su config), marcando
+   * cuáles están ocupadas por una cita. Útil para el formulario de crear cita,
+   * que muestra el día completo y avisa si un horario ya está tomado.
+   * Devuelve [] en días no laborales.
+   */
+  franjasDelDia(fecha: string, profId?: string): { hora: string; ocupada: boolean }[] {
+    if (!this.esDiaLaboral(fecha, profId)) return [];
+    const { horaInicio, horaFin, duracionSlot } = this.configDe(profId);
+    const ocupadas = new Set(this.citasDelDia(fecha, profId).map((c) => c.hora));
+    const franjas: { hora: string; ocupada: boolean }[] = [];
+    for (let mins = horaInicio * 60; mins < horaFin * 60; mins += duracionSlot) {
+      const hh = String(Math.floor(mins / 60)).padStart(2, "0");
+      const mm = String(mins % 60).padStart(2, "0");
+      const hora = `${hh}:${mm}`;
+      franjas.push({ hora, ocupada: ocupadas.has(hora) });
+    }
+    return franjas;
+  }
+
   // ── Upcoming / grouping ──
   get upcoming(): Cita[] {
     const today = todayIso();
@@ -328,6 +348,62 @@ class AgendaStore {
     const totales = this.clientes.reduce((s, c) => s + c.totalCitas, 0);
     if (totales === 0) return 0;
     return Math.round((this.totalNoShows / totales) * 100);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SALUD OPERATIVA DE LAS CITAS (distribución por estado)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /** Conteo de citas registradas por estado (todas las citas del sistema). */
+  get conteoPorEstado(): Record<CitaEstado, number> {
+    const base: Record<CitaEstado, number> = { pendiente: 0, confirmada: 0, completada: 0, cancelada: 0, noshow: 0 };
+    for (const c of this.citas) base[c.estado]++;
+    return base;
+  }
+
+  /** Total de citas registradas (todos los estados). */
+  get totalCitasRegistradas(): number {
+    return this.citas.length;
+  }
+
+  /** % de citas completadas sobre el total registrado. */
+  get tasaCompletadas(): number {
+    if (this.citas.length === 0) return 0;
+    return Math.round((this.conteoPorEstado.completada / this.citas.length) * 100);
+  }
+
+  /** % de citas canceladas sobre el total registrado. */
+  get tasaCancelacion(): number {
+    if (this.citas.length === 0) return 0;
+    return Math.round((this.conteoPorEstado.cancelada / this.citas.length) * 100);
+  }
+
+  /** % de inasistencias (no-show) sobre el total registrado de citas. */
+  get tasaInasistencia(): number {
+    if (this.citas.length === 0) return 0;
+    return Math.round((this.conteoPorEstado.noshow / this.citas.length) * 100);
+  }
+
+  /**
+   * Tendencia operativa por semana (últimas 4): cuántas citas se completaron,
+   * cancelaron o resultaron en inasistencia cada semana. Para la gráfica lineal.
+   */
+  get tendenciaOperativa(): { semana: string; completadas: number; canceladas: number; noshow: number }[] {
+    const mk = () => [0, 0, 0, 0];
+    const completadas = mk(), canceladas = mk(), noshow = mk();
+    const now = new Date();
+    for (const c of this.citas) {
+      const d = new Date(c.fecha + "T00:00:00");
+      const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+      if (diffDays < 0 || diffDays > 27) continue;
+      const wk = 3 - Math.floor(diffDays / 7);
+      if (wk < 0 || wk >= 4) continue;
+      if (c.estado === "completada") completadas[wk]++;
+      else if (c.estado === "cancelada") canceladas[wk]++;
+      else if (c.estado === "noshow") noshow[wk]++;
+    }
+    const labels = ["-3 sem", "-2 sem", "-1 sem", "Esta sem"];
+    return labels.map((semana, i) => ({ semana, completadas: completadas[i], canceladas: canceladas[i], noshow: noshow[i] }));
   }
 
   /** Occupancy per professional: number of upcoming citas assigned. */
