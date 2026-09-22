@@ -8,6 +8,7 @@ import {
 import { ThemeToggleButton } from "@/shell";
 import { AppSidebar } from "@/app/AppSidebar";
 import { AppFooter } from "@/shell/footer";
+import { FueraDeServicioBanner } from "@/app/FueraDeServicioBanner";
 import { sessionStore } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -108,6 +109,7 @@ export const AppShell = () => {
       header={<AppHeader />}
       footer={<AppFooter />}
     >
+      <FueraDeServicioBanner />
       <Outlet />
     </BaseAppShell>
   );

@@ -5,7 +5,7 @@ import { PageMeta } from "@/shell/meta";
 import { Button } from "@/elements/ui/button";
 import { Card, CardTitle, CardDescription } from "@/elements/ui/card";
 import { ThemeToggleButton } from "@/shell";
-import { sessionStore, type Modulo, type Rol } from "@/stores";
+import { queuesStore, sessionStore, type Modulo, type Rol } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ICONS
@@ -190,14 +190,20 @@ export const SeleccionarPage = observer(() => {
 
   const goToRol = () => {
     if (modulos.length === 0) return;
+    // Prueba "Simular inicio desde 0": ya sabemos que somos administradores, así
+    // que nos saltamos el paso de rol y confirmamos directo como admin.
+    if (queuesStore.onboardingPendiente) {
+      entrar(modulos, "administrador");
+      return;
+    }
     setStep(2);
   };
 
-  const confirmar = () => {
-    if (modulos.length === 0 || !rol) return;
-    sessionStore.configurar(modulos, rol);
+  /** Aplica la selección y navega según el rol/flujo. */
+  const entrar = (mods: Modulo[], r: Rol) => {
+    sessionStore.configurar(mods, r);
 
-    if (rol === "operador") {
+    if (r === "operador") {
       // Un operador "sale de" un administrador: en vez de entrar al modulo,
       // pasa por una pantalla para dejar sus datos, que (mock) le llegan como
       // notificacion al administrador para darlo de alta.
@@ -205,9 +211,21 @@ export const SeleccionarPage = observer(() => {
       return;
     }
 
+    // Onboarding de configuracion: SOLO cuando se activo "Simular inicio desde 0"
+    // (es una prueba). El inicio normal nunca pasa por aqui.
+    if (mods.includes("turnos") && queuesStore.onboardingPendiente) {
+      navigate("/configuracion-turnos");
+      return;
+    }
+
     // Administrador: entra directo al modulo funcional. Regla acordada: si
     // eligio ambos modulos, entra por Turnos (navegable luego por el sidebar).
     navigate(sessionStore.moduloEntryPath);
+  };
+
+  const confirmar = () => {
+    if (modulos.length === 0 || !rol) return;
+    entrar(modulos, rol);
   };
 
   return (

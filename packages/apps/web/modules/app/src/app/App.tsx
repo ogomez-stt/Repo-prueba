@@ -12,6 +12,7 @@ import { EncuestasPage, EncuestaCompartir } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
 import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
 import { SeleccionarPage } from "@/pages/seleccionar";
+import { ConfiguracionTurnosPage, ConfiguracionPage } from "@/pages/configuracion";
 import { SimuladorWhatsApp } from "@/pages/simulador";
 import { OperadorRegistroPage, OperadorLoginPage } from "@/pages/operador";
 import { OperadoresTurnosPage, OperadoresAgendamientoPage } from "@/pages/operadores";
@@ -166,7 +167,7 @@ export default function App() {
             SeccionGuard muestra el aviso de sin acceso si intenta entrar por URL */}
         <Route path="/turnos/operadores" element={<SeccionGuard seccion="__solo_admin__"><OperadoresTurnosPage /></SeccionGuard>} />
         <Route path="/agendamiento/operadores" element={<SeccionGuard seccion="__solo_admin__"><OperadoresAgendamientoPage /></SeccionGuard>} />
-        <Route path="/configuracion" element={<PlaceholderPage title="Configuracion" />} />
+        <Route path="/configuracion" element={<ConfiguracionPage />} />
         <Route path="/ayuda" element={<PlaceholderPage title="Ayuda" />} />
       </Route>
 
@@ -175,6 +176,7 @@ export default function App() {
           Páginas sin shell - tienen su propio layout completo
           ════════════════════════════════════════════════════════════════════ */}
       <Route path="/seleccionar" element={<SeleccionarPage />} />
+      <Route path="/configuracion-turnos" element={<ConfiguracionTurnosPage />} />
       <Route path="/operador/registro" element={<OperadorRegistroPage />} />
       <Route path="/operador/login" element={<OperadorLoginPage />} />
       <Route path="/wa" element={<SimuladorWhatsApp />} />

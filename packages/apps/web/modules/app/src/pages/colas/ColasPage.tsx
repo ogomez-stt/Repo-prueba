@@ -15,9 +15,17 @@ interface QueueForm {
   modo: AttentionMode;
   tiempo: string;
   campos: CustomField[];
+  // Reglas propias de la fila (opcionales; vacío = usar la regla global).
+  prefijo: string;
+  urgencia: string;
+  busy: string;
+  full: string;
 }
 
-const emptyForm: QueueForm = { nombre: "", servicio: "general", modo: "auto", tiempo: "10", campos: [] };
+const emptyForm: QueueForm = {
+  nombre: "", servicio: "general", modo: "auto", tiempo: "10", campos: [],
+  prefijo: "", urgencia: "", busy: "", full: "",
+};
 
 const fieldTypeLabels: { value: FieldType; label: string }[] = [
   { value: "text", label: "Texto corto" },
@@ -58,8 +66,24 @@ export const ColasPage = observer(() => {
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (q: Queue) => {
     setEditingId(q.id);
-    setForm({ nombre: q.nombre, servicio: q.servicio, modo: q.mode, tiempo: String(q.tiempoProm), campos: q.campos.map((c) => ({ ...c })) });
+    setForm({
+      nombre: q.nombre,
+      servicio: q.servicio,
+      modo: q.mode,
+      tiempo: String(q.tiempoProm),
+      campos: q.campos.map((c) => ({ ...c })),
+      prefijo: q.prefijo ?? "",
+      urgencia: q.urgenciaMin != null ? String(q.urgenciaMin) : "",
+      busy: q.saturacionBusy != null ? String(q.saturacionBusy) : "",
+      full: q.saturacionFull != null ? String(q.saturacionFull) : "",
+    });
     setModalOpen(true);
+  };
+
+  /** Input numérico opcional → number | undefined (vacío = usar global). */
+  const numOpt = (v: string): number | undefined => {
+    const n = Number(v);
+    return v.trim() && Number.isFinite(n) && n > 0 ? n : undefined;
   };
 
   // ── Custom fields editor ──
@@ -99,6 +123,11 @@ export const ColasPage = observer(() => {
         mode: form.modo,
         tiempoProm: Number(form.tiempo) || 10,
         campos,
+        // null limpia el override cuando el campo queda vacío (vuelve al global).
+        prefijo: form.prefijo.trim() ? form.prefijo.trim() : null,
+        urgenciaMin: numOpt(form.urgencia) ?? null,
+        saturacionBusy: numOpt(form.busy) ?? null,
+        saturacionFull: numOpt(form.full) ?? null,
       });
       showToast("Fila actualizada");
     } else {
@@ -108,6 +137,10 @@ export const ColasPage = observer(() => {
         mode: form.modo,
         tiempoProm: Number(form.tiempo) || 10,
         campos,
+        prefijo: form.prefijo.trim() || undefined,
+        urgenciaMin: numOpt(form.urgencia),
+        saturacionBusy: numOpt(form.busy),
+        saturacionFull: numOpt(form.full),
       });
       showToast("Fila creada");
     }
@@ -132,6 +165,14 @@ export const ColasPage = observer(() => {
   };
 
   const deletingQueue = queues.find((q) => q.id === deleteId);
+
+  // Prefijo que usaría la fila si no define uno propio (prefijo fijo global o
+  // la inicial del nombre), para mostrarlo como placeholder.
+  const reglasGlobales = queuesStore.turnoRules;
+  const prefijoPorDefecto =
+    reglasGlobales.prefijoModo === "fijo" && reglasGlobales.prefijoFijo
+      ? reglasGlobales.prefijoFijo
+      : (form.nombre.trim().charAt(0).toUpperCase() || "A");
 
   return (
     <>
@@ -246,6 +287,61 @@ export const ColasPage = observer(() => {
               onChange={(e) => setForm({ ...form, tiempo: e.target.value })}
               className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-700 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:text-gray-200"
             />
+          </div>
+
+          {/* Reglas propias de la fila (opcionales) */}
+          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reglas de esta fila</label>
+            <p className="mb-3 mt-1 text-xs text-gray-400">
+              Opcional. Personaliza el prefijo del turno, el tiempo de urgencia y los umbrales de saturación. Si lo dejas vacío, la fila usa la regla global del negocio.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Prefijo del turno</label>
+                <input
+                  value={form.prefijo}
+                  maxLength={4}
+                  onChange={(e) => setForm({ ...form, prefijo: e.target.value })}
+                  placeholder={`Por defecto: ${prefijoPorDefecto}`}
+                  className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Urgente ≥ (min)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.urgencia}
+                    onChange={(e) => setForm({ ...form, urgencia: e.target.value })}
+                    placeholder={`${queuesStore.turnoRules.urgenciaMin}`}
+                    className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Ocupada ≥</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.busy}
+                    onChange={(e) => setForm({ ...form, busy: e.target.value })}
+                    placeholder={`${queuesStore.turnoRules.saturacionBusy}`}
+                    className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Llena ≥</label>
+                  <input
+                    type="number"
+                    min={2}
+                    value={form.full}
+                    onChange={(e) => setForm({ ...form, full: e.target.value })}
+                    placeholder={`${queuesStore.turnoRules.saturacionFull}`}
+                    className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-gray-200"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Custom fields editor */}

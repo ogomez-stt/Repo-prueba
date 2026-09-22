@@ -62,7 +62,7 @@ export const TurnosPage = observer(() => {
     numero: t.numero,
     cliente: t.cliente,
     espera: t.espera,
-    urgent: queuesStore.isUrgent(t as any),
+    urgent: queuesStore.isUrgent(t as any, queue),
   });
 
   const matchFilter = (t: { cliente: string; numero: string }) =>
@@ -71,7 +71,7 @@ export const TurnosPage = observer(() => {
     t.numero.toLowerCase().includes(search.toLowerCase());
 
   const waiting = queue.waiting.filter(matchFilter);
-  const urgentCount = queue.waiting.filter((t) => queuesStore.isUrgent(t)).length;
+  const urgentCount = queue.waiting.filter((t) => queuesStore.isUrgent(t, queue)).length;
   const waitingCount = queue.waiting.length;
 
   const subtitle = waitingCount > 0

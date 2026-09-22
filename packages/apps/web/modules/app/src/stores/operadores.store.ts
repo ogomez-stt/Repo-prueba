@@ -257,6 +257,18 @@ export class OperadoresStore {
   eliminar(id: string) {
     this.operadores = this.operadores.filter((o) => o.id !== id);
   }
+
+  // ── Modo demo ("desde 0") ────────────────────────────────────────────────
+
+  /** Deja el equipo de operadores vacio (para "Simular inicio desde 0"). */
+  iniciarDesdeCero() {
+    this.operadores = [];
+  }
+
+  /** Restaura los operadores de ejemplo (seed) para el inicio normal. */
+  restaurarSeed() {
+    this.operadores = [...SEED];
+  }
 }
 
 export const operadoresStore = new OperadoresStore();

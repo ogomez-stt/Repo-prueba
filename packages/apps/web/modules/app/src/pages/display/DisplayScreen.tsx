@@ -48,7 +48,12 @@ const Clock = () => {
 export const DisplayScreen = observer(() => {
   const [params] = useSearchParams();
   const colaId = params.get("cola");
-  const soundOn = params.get("sound") === "1";
+  const cfg = queuesStore.displayConfig;
+  const biz = queuesStore.businessConfig;
+
+  // El sonido puede forzarse por query (?sound=1/0); si no, usa la config.
+  const soundParam = params.get("sound");
+  const soundOn = soundParam !== null ? soundParam === "1" : cfg.sonido;
 
   const queue = (colaId && queuesStore.getQueue(colaId)) || queuesStore.queues[0];
 
@@ -83,7 +88,11 @@ export const DisplayScreen = observer(() => {
     <div className="relative flex min-h-screen flex-col bg-secondary-900 text-white">
       {/* Header */}
       <header className="flex items-center justify-between px-10 py-6">
-        <img src="/images/logo/necto-full-white.svg" alt="NECTO" className="h-7 w-auto" />
+        {cfg.usarLogoNegocio && biz.logoUrl ? (
+          <img src={biz.logoUrl} alt={biz.nombre || "Logo"} className="h-10 w-auto rounded object-contain" />
+        ) : (
+          <img src="/images/logo/necto-full-white.svg" alt="NECTO" className="h-7 w-auto" />
+        )}
         <div className="flex items-center gap-6">
           <span className="rounded-full bg-white/10 px-4 py-1.5 text-lg font-medium">{queue.nombre}</span>
           <Clock />
@@ -104,7 +113,7 @@ export const DisplayScreen = observer(() => {
             {current ? (
               <>
                 <p className="my-4 text-[10rem] font-black leading-none tracking-tight">{current.numero}</p>
-                <p className="text-4xl font-semibold">{current.cliente}</p>
+                {cfg.mostrarNombre && <p className="text-4xl font-semibold">{current.cliente}</p>}
                 <p className="mt-3 text-2xl text-white/80">Pasar a {queue.nombre}</p>
               </>
             ) : (
@@ -117,7 +126,7 @@ export const DisplayScreen = observer(() => {
         <div className="flex flex-1 flex-col rounded-[2rem] bg-white/5 p-8">
           <h2 className="mb-6 text-2xl font-semibold uppercase tracking-wide text-white/60">Siguientes</h2>
           <div className="flex flex-1 flex-col gap-4">
-            {queue.waiting.slice(0, 5).map((t, i) => (
+            {queue.waiting.slice(0, cfg.siguientesVisibles).map((t, i) => (
               <div
                 key={t.numero}
                 className={
@@ -126,7 +135,7 @@ export const DisplayScreen = observer(() => {
                 }
               >
                 <span className="text-4xl font-bold">{t.numero}</span>
-                <span className="text-xl text-white/70">{t.cliente}</span>
+                {cfg.mostrarNombre && <span className="text-xl text-white/70">{t.cliente}</span>}
               </div>
             ))}
             {queue.waiting.length === 0 && (
@@ -135,6 +144,11 @@ export const DisplayScreen = observer(() => {
           </div>
         </div>
       </div>
+
+      {/* Mensaje de pie configurable */}
+      {cfg.mensajePie.trim() && (
+        <p className="pb-6 text-center text-xl text-white/60">{cfg.mensajePie}</p>
+      )}
 
       {/* Exit hint */}
       <Link

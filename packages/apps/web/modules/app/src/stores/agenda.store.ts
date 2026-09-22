@@ -183,6 +183,25 @@ class AgendaStore {
     makeAutoObservable(this);
   }
 
+  // ── Modo demo ("desde 0") ────────────────────────────────────────────────
+
+  /**
+   * Deja Agendamiento vacio (sin profesionales, clientes ni citas) para
+   * "Simular inicio desde 0". Reversible con restaurarSeed().
+   */
+  iniciarDesdeCero(): void {
+    this.profesionales = [];
+    this.clientes = [];
+    this.citas = [];
+  }
+
+  /** Restaura los datos de ejemplo (seed) de Agendamiento para el inicio normal. */
+  restaurarSeed(): void {
+    this.profesionales = PROFESIONALES;
+    this.clientes = seedClientes();
+    this.citas = seedCitas();
+  }
+
   /** Actualiza la disponibilidad (config) de un profesional concreto. */
   updateProfesionalConfig(profId: string, data: Partial<CalendarConfig>): void {
     const p = this.getProfesional(profId);

@@ -5,7 +5,7 @@ import { Label } from "@/elements/form/label";
 import { Input } from "@/elements/form/input";
 import { Checkbox } from "@/elements/form/checkbox";
 import { Button } from "@/elements/ui/button";
-import { sessionStore } from "@/stores";
+import { agendaStore, operadoresStore, queuesStore, sessionStore } from "@/stores";
 
 /**
  * @kgId 07b80348fc4c
@@ -18,14 +18,39 @@ export default function SignInForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: integrate with Cognito auth
-    // Flujo de arranque (mock): si aun no se eligio modulo + rol, primero el
-    // usuario pasa por la vista de seleccion. Si ya esta configurado, entra
-    // directo al modulo elegido.
+    // Inicio normal (mock): usa los datos de ejemplo de siempre y NO pasa por el
+    // onboarding de configuracion (ese flujo es solo para "Simular inicio desde 0").
+    // Restaura el seed por si venimos de una sesion "desde 0".
+    queuesStore.restaurarSeed();
+    operadoresStore.restaurarSeed();
+    agendaStore.restaurarSeed();
+
+    // Flujo de arranque: si aun no se eligio modulo + rol, primero el usuario
+    // pasa por la vista de seleccion. Si ya esta configurado, entra directo al
+    // modulo elegido.
     if (sessionStore.isReady) {
       navigate(sessionStore.moduloEntryPath);
     } else {
       navigate("/seleccionar");
     }
+  };
+
+  /**
+   * Simular inicio desde 0 (mock): arranca como un negocio recien creado.
+   * Limpia la sesion (modulo/rol) y vacia TODOS los datos de ejemplo (filas,
+   * operadores, profesionales, citas, encuestas) para vivir el onboarding
+   * completo. Activa el flujo de configuracion (solo esta prueba lo dispara).
+   * Es reversible: el inicio normal restaura el seed.
+   */
+  const simularDesdeCero = () => {
+    sessionStore.reset();
+    queuesStore.iniciarDesdeCero();
+    operadoresStore.iniciarDesdeCero();
+    agendaStore.iniciarDesdeCero();
+    queuesStore.activarOnboarding();
+    // Pasa por la selección de MÓDULO, pero se salta la de rol: en esta prueba
+    // ya sabemos que somos administradores.
+    navigate("/seleccionar");
   };
 
   return (
@@ -85,6 +110,25 @@ export default function SignInForm() {
               </svg>
               Google
             </button>
+            <div className="mt-5">
+              <Button
+                className="w-full border-dashed"
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={simularDesdeCero}
+                startIcon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992M4.522 9.348a8.25 8.25 0 0113.803-3.03L20.015 9.5M19.478 14.652a8.25 8.25 0 01-13.803 3.03L3.985 14.5" />
+                  </svg>
+                }
+              >
+                Simular inicio desde 0
+              </Button>
+              <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                Reinicia módulo, rol y configuración para probar el onboarding.
+              </p>
+            </div>
             <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400">
                 No tienes una cuenta?{" "}

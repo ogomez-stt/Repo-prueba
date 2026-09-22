@@ -37,6 +37,15 @@ export interface Queue {
   tiempoProm: number;         // minutes
   activa: boolean;
   campos: CustomField[];      // per-queue custom fields for ticket creation
+  /**
+   * Reglas propias de la fila. Cada campo es OPCIONAL: si es undefined, la fila
+   * usa la regla global (turnoRules). Permite personalizar prefijo, urgencia y
+   * umbrales de saturación fila por fila.
+   */
+  prefijo?: string;           // prefijo propio del número de turno (ej. "LAB")
+  urgenciaMin?: number;       // minutos para marcar urgente (override global)
+  saturacionBusy?: number;    // en espera para "ocupada" (override global)
+  saturacionFull?: number;    // en espera para "llena" (override global)
   waiting: Ticket[];
   serving: Ticket[];
   done: Ticket[];
@@ -112,7 +121,363 @@ function persistSurveyConfig(cfg: SurveyConfig): void {
   }
 }
 
-const URGENT_THRESHOLD = 10; // minutes
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACION DEL NEGOCIO (onboarding del modulo de Turnos)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Tipos de negocio soportados por el onboarding de Turnos. */
+export type TipoNegocio = "clinica" | "restaurante" | "tramites" | "salon" | "otro";
+
+/**
+ * Configuracion inicial del negocio para el modulo de Turnos.
+ * Se captura en el onboarding (primer inicio del admin) y se persiste local.
+ */
+export interface BusinessConfig {
+  /** Nombre del negocio (mostrado en pantallas y encuesta). */
+  nombre: string;
+  /** Tipo de negocio elegido (define el preset de filas sugerido). */
+  tipoNegocio: TipoNegocio;
+  /**
+   * Logo del negocio como data URL (base64) subido por el usuario, o URL.
+   * Vacio = sin logo. En el onboarding se sube como imagen (data URL).
+   */
+  logoUrl: string;
+  /** A que se dedica el negocio (giro / descripcion corta). */
+  descripcion: string;
+  /** Telefono de contacto del negocio. */
+  telefono: string;
+  /** Correo de contacto del negocio. */
+  email: string;
+  /** Direccion del negocio (opcional). */
+  direccion: string;
+  /** Como se llama internamente cada unidad de atencion (ej: "Fila", "Turno"). */
+  terminologia: string;
+  /** True cuando el admin ya completo el onboarding de Turnos. */
+  configurado: boolean;
+}
+
+const DEFAULT_BUSINESS_CONFIG: BusinessConfig = {
+  nombre: "",
+  tipoNegocio: "otro",
+  logoUrl: "",
+  descripcion: "",
+  telefono: "",
+  email: "",
+  direccion: "",
+  terminologia: "Fila",
+  configurado: false,
+};
+
+const BUSINESS_CONFIG_KEY = "necto.businessConfig";
+
+/** Carga la config del negocio (merge con defaults) desde localStorage. */
+function loadBusinessConfig(): BusinessConfig {
+  try {
+    const raw = localStorage.getItem(BUSINESS_CONFIG_KEY);
+    if (raw) return { ...DEFAULT_BUSINESS_CONFIG, ...JSON.parse(raw) };
+  } catch {
+    // Entorno sin localStorage o JSON invalido: usa defaults.
+  }
+  return { ...DEFAULT_BUSINESS_CONFIG };
+}
+
+/** Persiste la config del negocio en localStorage. */
+function persistBusinessConfig(cfg: BusinessConfig): void {
+  try {
+    localStorage.setItem(BUSINESS_CONFIG_KEY, JSON.stringify(cfg));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HORARIO DE ATENCION DEL NEGOCIO
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Dia de la semana (0 = Domingo … 6 = Sabado, igual que Date.getDay()). */
+export type DiaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Horario de un dia: si atiende y en que franja (horas 0–24). */
+export interface HorarioDia {
+  dia: DiaSemana;
+  abierto: boolean;
+  /** Hora de apertura (0–23). */
+  desde: number;
+  /** Hora de cierre (1–24). */
+  hasta: number;
+}
+
+/** Etiquetas legibles de cada dia (para la UI), indexadas por DiaSemana. */
+export const DIAS_SEMANA: { dia: DiaSemana; label: string; corto: string }[] = [
+  { dia: 1, label: "Lunes", corto: "Lun" },
+  { dia: 2, label: "Martes", corto: "Mar" },
+  { dia: 3, label: "Miércoles", corto: "Mié" },
+  { dia: 4, label: "Jueves", corto: "Jue" },
+  { dia: 5, label: "Viernes", corto: "Vie" },
+  { dia: 6, label: "Sábado", corto: "Sáb" },
+  { dia: 0, label: "Domingo", corto: "Dom" },
+];
+
+/** Horario por defecto: Lun–Vie 8–18, Sáb 9–13, Dom cerrado. */
+const DEFAULT_HORARIO: HorarioDia[] = [
+  { dia: 0, abierto: false, desde: 9, hasta: 13 },
+  { dia: 1, abierto: true, desde: 8, hasta: 18 },
+  { dia: 2, abierto: true, desde: 8, hasta: 18 },
+  { dia: 3, abierto: true, desde: 8, hasta: 18 },
+  { dia: 4, abierto: true, desde: 8, hasta: 18 },
+  { dia: 5, abierto: true, desde: 8, hasta: 18 },
+  { dia: 6, abierto: true, desde: 9, hasta: 13 },
+];
+
+const HORARIO_KEY = "necto.horario";
+
+/** Normaliza/valida un horario cargado, completando dias faltantes con el default. */
+function normalizarHorario(parsed: unknown): HorarioDia[] {
+  const base = DEFAULT_HORARIO.map((d) => ({ ...d }));
+  if (!Array.isArray(parsed)) return base;
+  for (const item of parsed as Partial<HorarioDia>[]) {
+    const idx = base.findIndex((d) => d.dia === item?.dia);
+    if (idx !== -1) {
+      base[idx] = {
+        dia: base[idx].dia,
+        abierto: typeof item?.abierto === "boolean" ? item.abierto : base[idx].abierto,
+        desde: typeof item?.desde === "number" ? item.desde : base[idx].desde,
+        hasta: typeof item?.hasta === "number" ? item.hasta : base[idx].hasta,
+      };
+    }
+  }
+  return base;
+}
+
+function loadHorario(): HorarioDia[] {
+  try {
+    const raw = localStorage.getItem(HORARIO_KEY);
+    if (raw) return normalizarHorario(JSON.parse(raw));
+  } catch {
+    // Sin localStorage o JSON invalido: usa el default.
+  }
+  return DEFAULT_HORARIO.map((d) => ({ ...d }));
+}
+
+function persistHorario(h: HorarioDia[]): void {
+  try {
+    localStorage.setItem(HORARIO_KEY, JSON.stringify(h));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
+}
+
+/** Fila precargada por preset (subconjunto editable de Queue, sin tickets). */
+export interface PresetQueue {
+  nombre: string;
+  servicio: string;
+  mode: AttentionMode;
+  tiempoProm: number;
+  campos: CustomField[];
+}
+
+export interface NegocioPreset {
+  tipo: TipoNegocio;
+  label: string;
+  descripcion: string;
+  /** Terminologia sugerida para las unidades de atencion. */
+  terminologia: string;
+  /** Filas que se precargan al elegir este preset. */
+  filas: PresetQueue[];
+}
+
+/** Catalogo de presets por tipo de negocio (con filas precargadas). */
+const NEGOCIO_PRESETS: NegocioPreset[] = [
+  {
+    tipo: "clinica",
+    label: "Clinica / Salud",
+    descripcion: "Consultas, laboratorio y atencion medica.",
+    terminologia: "Fila",
+    filas: [
+      {
+        nombre: "Consulta general", servicio: "general", mode: "auto", tiempoProm: 14,
+        campos: [
+          { id: "motivo", label: "Motivo de consulta", type: "textarea", required: true },
+          { id: "documento", label: "Documento", type: "text", required: false },
+        ],
+      },
+      {
+        nombre: "Laboratorio", servicio: "general", mode: "manual", tiempoProm: 25,
+        campos: [],
+      },
+    ],
+  },
+  {
+    tipo: "restaurante",
+    label: "Restaurante",
+    descripcion: "Pedidos en mesa, para llevar y domicilio.",
+    terminologia: "Fila",
+    filas: [
+      {
+        nombre: "En mesa", servicio: "restaurante", mode: "manual", tiempoProm: 20,
+        campos: [
+          { id: "pedido", label: "Pedido", type: "textarea", required: true },
+          { id: "personas", label: "N° de personas", type: "number", required: false },
+        ],
+      },
+      {
+        nombre: "Para llevar", servicio: "restaurante", mode: "auto", tiempoProm: 12,
+        campos: [{ id: "pedido", label: "Pedido", type: "textarea", required: true }],
+      },
+      {
+        nombre: "Domicilio", servicio: "restaurante", mode: "auto", tiempoProm: 35,
+        campos: [
+          { id: "pedido", label: "Pedido", type: "textarea", required: true },
+          { id: "direccion", label: "Direccion", type: "text", required: true },
+        ],
+      },
+    ],
+  },
+  {
+    tipo: "tramites",
+    label: "Banco / Tramites",
+    descripcion: "Atencion en ventanilla y tramites por tipo.",
+    terminologia: "Turno",
+    filas: [
+      {
+        nombre: "Caja", servicio: "general", mode: "auto", tiempoProm: 8,
+        campos: [{ id: "documento", label: "Documento", type: "text", required: true }],
+      },
+      {
+        nombre: "Atencion al cliente", servicio: "general", mode: "auto", tiempoProm: 15,
+        campos: [{ id: "motivo", label: "Motivo", type: "textarea", required: false }],
+      },
+    ],
+  },
+  {
+    tipo: "salon",
+    label: "Salon / Estetica",
+    descripcion: "Turnos por servicio (corte, color, unas).",
+    terminologia: "Turno",
+    filas: [
+      {
+        nombre: "Corte", servicio: "general", mode: "manual", tiempoProm: 30,
+        campos: [{ id: "servicio", label: "Servicio", type: "text", required: false }],
+      },
+      {
+        nombre: "Color / Tratamiento", servicio: "general", mode: "manual", tiempoProm: 60,
+        campos: [{ id: "servicio", label: "Servicio", type: "text", required: false }],
+      },
+    ],
+  },
+  {
+    tipo: "otro",
+    label: "Otro / Personalizado",
+    descripcion: "Empieza sin filas y crealas a tu medida.",
+    terminologia: "Fila",
+    filas: [],
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLAS DE TURNOS (configurables)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** De dónde sale el prefijo del número de turno. */
+export type PrefijoModo = "inicial" | "fijo";
+
+/**
+ * Reglas globales de generación y estado de los turnos del negocio.
+ * Reemplazan las constantes que antes estaban fijas en el código.
+ */
+export interface TurnoRules {
+  /**
+   * Cómo se arma el prefijo del número de turno:
+   * - "inicial": la primera letra del nombre de la fila (A-045, L-018).
+   * - "fijo": un prefijo único para todas las filas (definido en `prefijoFijo`).
+   */
+  prefijoModo: PrefijoModo;
+  /** Prefijo único usado cuando prefijoModo = "fijo" (ej. "T"). */
+  prefijoFijo: string;
+  /** Reinicia la numeración cada día (mock: informativo por ahora). */
+  reinicioDiario: boolean;
+  /** Minutos de espera desde los que un turno se marca como urgente. */
+  urgenciaMin: number;
+  /** N° de turnos en espera desde el que una fila se considera "ocupada". */
+  saturacionBusy: number;
+  /** N° de turnos en espera desde el que una fila se considera "llena". */
+  saturacionFull: number;
+}
+
+const DEFAULT_TURNO_RULES: TurnoRules = {
+  prefijoModo: "inicial",
+  prefijoFijo: "T",
+  reinicioDiario: true,
+  urgenciaMin: 10,
+  saturacionBusy: 4,
+  saturacionFull: 8,
+};
+
+const TURNO_RULES_KEY = "necto.turnoRules";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACION DE LA PANTALLA DE SALA (DISPLAY)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Config de la pantalla pública de sala (/display). */
+export interface DisplayConfig {
+  /** Reproducir un beep cuando cambia el turno llamado. */
+  sonido: boolean;
+  /** Mostrar el nombre del cliente (si no, solo el número — más privado). */
+  mostrarNombre: boolean;
+  /** Cuántos turnos "siguientes" listar (1–8). */
+  siguientesVisibles: number;
+  /** Usar el logo del negocio (si no, el logo de NECTO). */
+  usarLogoNegocio: boolean;
+  /** Mensaje opcional en el pie de la pantalla (ej. "Gracias por su visita"). */
+  mensajePie: string;
+}
+
+const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
+  sonido: true,
+  mostrarNombre: true,
+  siguientesVisibles: 5,
+  usarLogoNegocio: false,
+  mensajePie: "",
+};
+
+const DISPLAY_CONFIG_KEY = "necto.displayConfig";
+
+function loadDisplayConfig(): DisplayConfig {
+  try {
+    const raw = localStorage.getItem(DISPLAY_CONFIG_KEY);
+    if (raw) return { ...DEFAULT_DISPLAY_CONFIG, ...JSON.parse(raw) };
+  } catch {
+    // Sin localStorage o JSON invalido: usa defaults.
+  }
+  return { ...DEFAULT_DISPLAY_CONFIG };
+}
+
+function persistDisplayConfig(c: DisplayConfig): void {
+  try {
+    localStorage.setItem(DISPLAY_CONFIG_KEY, JSON.stringify(c));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
+}
+
+function loadTurnoRules(): TurnoRules {
+  try {
+    const raw = localStorage.getItem(TURNO_RULES_KEY);
+    if (raw) return { ...DEFAULT_TURNO_RULES, ...JSON.parse(raw) };
+  } catch {
+    // Sin localStorage o JSON invalido: usa defaults.
+  }
+  return { ...DEFAULT_TURNO_RULES };
+}
+
+function persistTurnoRules(r: TurnoRules): void {
+  try {
+    localStorage.setItem(TURNO_RULES_KEY, JSON.stringify(r));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SEED DATA
@@ -230,13 +595,19 @@ class QueuesStore {
   // ── Derived / stats ──
   saturationOf(q: Queue): Saturation {
     if (!q.activa) return "ok";
-    if (q.waiting.length >= 8) return "full";
-    if (q.waiting.length >= 4) return "busy";
+    if (q.waiting.length >= this.saturacionFullDe(q)) return "full";
+    if (q.waiting.length >= this.saturacionBusyDe(q)) return "busy";
     return "ok";
   }
 
-  isUrgent(t: Ticket): boolean {
-    return t.waitedMin >= URGENT_THRESHOLD;
+  /**
+   * ¿El ticket es urgente? Si se pasa la fila, usa su umbral propio (con
+   * fallback global); si no, usa el umbral global. La fila es opcional para
+   * no romper las llamadas existentes.
+   */
+  isUrgent(t: Ticket, q?: Queue): boolean {
+    const umbral = q ? this.urgenciaDe(q) : this.turnoRules.urgenciaMin;
+    return t.waitedMin >= umbral;
   }
 
   get activeCount(): number {
@@ -274,7 +645,17 @@ class QueuesStore {
   }
 
   // ── Queue CRUD ──
-  createQueue(data: { nombre: string; servicio: string; mode: AttentionMode; tiempoProm: number; campos?: CustomField[] }): void {
+  createQueue(data: {
+    nombre: string;
+    servicio: string;
+    mode: AttentionMode;
+    tiempoProm: number;
+    campos?: CustomField[];
+    prefijo?: string;
+    urgenciaMin?: number;
+    saturacionBusy?: number;
+    saturacionFull?: number;
+  }): void {
     const color = COLOR_OPTIONS[this.queues.length % COLOR_OPTIONS.length];
     this.queues.push({
       id: crypto.randomUUID(),
@@ -285,6 +666,10 @@ class QueuesStore {
       tiempoProm: data.tiempoProm,
       activa: true,
       campos: data.campos ?? [],
+      prefijo: data.prefijo?.trim() ? data.prefijo.trim().toUpperCase() : undefined,
+      urgenciaMin: data.urgenciaMin,
+      saturacionBusy: data.saturacionBusy,
+      saturacionFull: data.saturacionFull,
       waiting: [],
       serving: [],
       done: [],
@@ -293,7 +678,18 @@ class QueuesStore {
     this.sync(null, queuesApi.create(data));
   }
 
-  updateQueue(id: string, data: { nombre?: string; servicio?: string; mode?: AttentionMode; tiempoProm?: number; campos?: CustomField[] }): void {
+  updateQueue(id: string, data: {
+    nombre?: string;
+    servicio?: string;
+    mode?: AttentionMode;
+    tiempoProm?: number;
+    campos?: CustomField[];
+    /** Reglas por fila. `null` = quitar el override y volver a la regla global. */
+    prefijo?: string | null;
+    urgenciaMin?: number | null;
+    saturacionBusy?: number | null;
+    saturacionFull?: number | null;
+  }): void {
     const q = this.getQueue(id);
     if (!q) return;
     if (data.nombre !== undefined) q.nombre = data.nombre;
@@ -301,6 +697,13 @@ class QueuesStore {
     if (data.mode !== undefined) q.mode = data.mode;
     if (data.tiempoProm !== undefined) q.tiempoProm = data.tiempoProm;
     if (data.campos !== undefined) q.campos = data.campos;
+    // Reglas por fila: null limpia el override (vuelve al global), undefined lo deja igual.
+    if (data.prefijo !== undefined) {
+      q.prefijo = data.prefijo && data.prefijo.trim() ? data.prefijo.trim().toUpperCase() : undefined;
+    }
+    if (data.urgenciaMin !== undefined) q.urgenciaMin = data.urgenciaMin ?? undefined;
+    if (data.saturacionBusy !== undefined) q.saturacionBusy = data.saturacionBusy ?? undefined;
+    if (data.saturacionFull !== undefined) q.saturacionFull = data.saturacionFull ?? undefined;
     this.sync(id, queuesApi.update(id, data));
   }
 
@@ -367,7 +770,7 @@ class QueuesStore {
     const q = this.getQueue(queueId);
     if (!q) return;
     // Optimistic local insert with a provisional number; refreshed from API.
-    const provisional = `${q.nombre.charAt(0).toUpperCase()}-${String(
+    const provisional = `${this.prefijoDe(q)}-${String(
       q.waiting.length + q.serving.length + q.done.length + 1,
     ).padStart(3, "0")}`;
     q.waiting.push({
@@ -415,6 +818,217 @@ class QueuesStore {
   updateSurveyConfig(data: Partial<SurveyConfig>): void {
     this.surveyConfig = { ...this.surveyConfig, ...data };
     persistSurveyConfig(this.surveyConfig);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONFIGURACION DEL NEGOCIO (onboarding de Turnos)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Config inicial del negocio para el modulo de Turnos (persistida local). */
+  businessConfig: BusinessConfig = loadBusinessConfig();
+
+  /**
+   * True cuando hay que mostrar el onboarding de configuracion de Turnos.
+   * Solo lo activa "Simular inicio desde 0" (es una prueba); el inicio normal
+   * nunca lo enciende. No se persiste: vive solo durante la sesion de prueba.
+   */
+  onboardingPendiente = false;
+
+  /** Enciende el onboarding de configuracion (usado por "Simular inicio desde 0"). */
+  activarOnboarding(): void {
+    this.onboardingPendiente = true;
+  }
+
+  // ── Horario de atencion ───────────────────────────────────────────────────
+
+  /** Horario de atencion del negocio por dia de la semana (persistido local). */
+  horario: HorarioDia[] = loadHorario();
+
+  /** Horario ordenado Lun→Dom para mostrar en la UI. */
+  get horarioOrdenado(): HorarioDia[] {
+    return DIAS_SEMANA.map((d) => this.horario.find((h) => h.dia === d.dia)!).filter(Boolean);
+  }
+
+  /** ¿El negocio esta abierto ahora mismo (segun el horario configurado)? */
+  get abiertoAhora(): boolean {
+    const now = new Date();
+    const dia = now.getDay() as DiaSemana;
+    const h = this.horario.find((x) => x.dia === dia);
+    if (!h || !h.abierto) return false;
+    const hora = now.getHours() + now.getMinutes() / 60;
+    return hora >= h.desde && hora < h.hasta;
+  }
+
+  /** Actualiza el horario de un dia concreto. */
+  updateHorarioDia(dia: DiaSemana, data: Partial<Omit<HorarioDia, "dia">>): void {
+    const idx = this.horario.findIndex((h) => h.dia === dia);
+    if (idx === -1) return;
+    const actual = this.horario[idx];
+    let desde = data.desde ?? actual.desde;
+    let hasta = data.hasta ?? actual.hasta;
+    // Coherencia: la apertura siempre antes del cierre.
+    if (hasta <= desde) {
+      if (data.desde !== undefined) hasta = Math.min(desde + 1, 24);
+      else desde = Math.max(hasta - 1, 0);
+    }
+    this.horario[idx] = { ...actual, ...data, desde, hasta };
+    persistHorario(this.horario);
+  }
+
+  // ── Reglas de turnos ──────────────────────────────────────────────────────
+
+  /** Config de la pantalla de sala (/display), persistida local. */
+  displayConfig: DisplayConfig = loadDisplayConfig();
+
+  /** Actualiza (parcialmente) la config del display y persiste. */
+  updateDisplayConfig(data: Partial<DisplayConfig>): void {
+    let next = { ...this.displayConfig, ...data };
+    if (data.siguientesVisibles !== undefined) {
+      const n = data.siguientesVisibles;
+      next.siguientesVisibles = Math.min(Math.max(Number.isFinite(n) ? n : 5, 1), 8);
+    }
+    this.displayConfig = next;
+    persistDisplayConfig(this.displayConfig);
+  }
+
+  /** Reglas globales de generación/estado de turnos (persistidas local). */
+  turnoRules: TurnoRules = loadTurnoRules();
+
+  /** Actualiza (parcialmente) las reglas de turnos y persiste. */
+  updateTurnoRules(data: Partial<TurnoRules>): void {
+    let next = { ...this.turnoRules, ...data };
+    // Coherencia de saturación: "llena" nunca por debajo de "ocupada".
+    if (next.saturacionFull <= next.saturacionBusy) {
+      next = { ...next, saturacionFull: next.saturacionBusy + 1 };
+    }
+    // Prefijo fijo válido (1–3 caracteres, sin espacios), en mayúsculas.
+    if (data.prefijoFijo !== undefined) {
+      next.prefijoFijo = data.prefijoFijo.trim().toUpperCase().slice(0, 3);
+    }
+    this.turnoRules = next;
+    persistTurnoRules(this.turnoRules);
+  }
+
+  /** Prefijo a usar para una fila. Prioridad: prefijo propio → regla global → inicial. */
+  prefijoDe(q: Queue): string {
+    // 1) Prefijo propio de la fila (si lo definió el admin).
+    if (q.prefijo && q.prefijo.trim()) return q.prefijo.trim().toUpperCase();
+    // 2) Regla global de prefijo fijo.
+    const r = this.turnoRules;
+    if (r.prefijoModo === "fijo" && r.prefijoFijo) return r.prefijoFijo;
+    // 3) Inicial del nombre de la fila.
+    return q.nombre.charAt(0).toUpperCase();
+  }
+
+  /** Minutos de urgencia efectivos de una fila (propio o global). */
+  urgenciaDe(q: Queue): number {
+    return q.urgenciaMin ?? this.turnoRules.urgenciaMin;
+  }
+
+  /** Umbral "ocupada" efectivo de una fila (propio o global). */
+  saturacionBusyDe(q: Queue): number {
+    return q.saturacionBusy ?? this.turnoRules.saturacionBusy;
+  }
+
+  /** Umbral "llena" efectivo de una fila (propio o global). */
+  saturacionFullDe(q: Queue): number {
+    return q.saturacionFull ?? this.turnoRules.saturacionFull;
+  }
+
+  /** Presets disponibles por tipo de negocio (solo lectura). */
+  get presets(): NegocioPreset[] {
+    return NEGOCIO_PRESETS;
+  }
+
+  /** True cuando el admin ya completo el onboarding de Turnos. */
+  get turnosConfigurado(): boolean {
+    return this.businessConfig.configurado;
+  }
+
+  getPreset(tipo: TipoNegocio): NegocioPreset | undefined {
+    return NEGOCIO_PRESETS.find((p) => p.tipo === tipo);
+  }
+
+  /** Actualiza campos de la config del negocio sin cerrar el onboarding. */
+  updateBusinessConfig(data: Partial<BusinessConfig>): void {
+    this.businessConfig = { ...this.businessConfig, ...data };
+    persistBusinessConfig(this.businessConfig);
+  }
+
+  /**
+   * Reemplaza TODAS las filas por las del preset elegido (onboarding).
+   * Cada fila se materializa como Queue vacia (sin tickets), con color rotativo.
+   */
+  aplicarPreset(tipo: TipoNegocio): void {
+    const preset = this.getPreset(tipo);
+    if (!preset) return;
+    this.queues = preset.filas.map((f, i) => ({
+      id: crypto.randomUUID(),
+      nombre: f.nombre,
+      color: COLOR_OPTIONS[i % COLOR_OPTIONS.length],
+      servicio: f.servicio,
+      mode: f.mode,
+      tiempoProm: f.tiempoProm,
+      activa: true,
+      campos: f.campos.map((c) => ({ ...c })),
+      waiting: [],
+      serving: [],
+      done: [],
+    }));
+    this.businessConfig = {
+      ...this.businessConfig,
+      tipoNegocio: tipo,
+      terminologia: preset.terminologia,
+    };
+    persistBusinessConfig(this.businessConfig);
+  }
+
+  /**
+   * Cierra el onboarding: fusiona los datos finales y marca `configurado = true`.
+   * Se llama al confirmar el ultimo paso del wizard.
+   */
+  guardarConfig(data: Partial<BusinessConfig>): void {
+    this.businessConfig = { ...this.businessConfig, ...data, configurado: true };
+    persistBusinessConfig(this.businessConfig);
+    this.onboardingPendiente = false;
+  }
+
+  /**
+   * "Simular inicio desde 0": limpia la config del negocio y deja las filas
+   * vacias para arrancar el onboarding desde cero.
+   */
+  resetTurnos(): void {
+    this.businessConfig = { ...DEFAULT_BUSINESS_CONFIG };
+    persistBusinessConfig(this.businessConfig);
+    this.queues = [];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MODO DEMO ("desde 0") — reset reversible de todos los datos de Turnos
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Deja el modulo de Turnos completamente vacio (sin filas ni encuestas) y
+   * limpia la config del negocio. Usado por "Simular inicio desde 0" para
+   * arrancar como un negocio recien creado. Reversible con restaurarSeed().
+   */
+  iniciarDesdeCero(): void {
+    this.queues = [];
+    this.surveys = [];
+    this.businessConfig = { ...DEFAULT_BUSINESS_CONFIG };
+    persistBusinessConfig(this.businessConfig);
+  }
+
+  /**
+   * Restaura los datos de ejemplo (seed) de Turnos: filas, encuestas y la
+   * config del negocio guardada. Usado por el inicio normal para volver a la
+   * data completa tras haber probado el modo "desde 0".
+   */
+  restaurarSeed(): void {
+    this.queues = seed();
+    this.surveys = seedSurveys();
+    this.businessConfig = loadBusinessConfig();
+    this.onboardingPendiente = false;
   }
 
   sentimentOf(rating: number): Sentiment {
