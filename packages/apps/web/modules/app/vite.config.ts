@@ -21,6 +21,8 @@ export default defineConfig({
   ],
   server: {
     port: 6020,
+    // Permite servir el dev server detrás de un túnel (Cloudflare Quick Tunnel).
+    allowedHosts: [".trycloudflare.com"],
     proxy: {
       // Proxy API calls to the local backend microservice (avoids CORS in dev).
       "/api": {
