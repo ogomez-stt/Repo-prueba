@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { PageMeta } from "@/shell/meta";
 import { CHATS, type Chat, type ChatMensaje } from "./chats.mock";
+import { CHATS_AGENDA } from "./chatsAgenda.mock";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -30,9 +31,19 @@ const ultimoTexto = (chat: Chat) => {
  * vista de la app (ej. la encuesta). No es parte del panel — es una demo del
  * canal externo.
  */
+type Modulo = "turnos" | "agendamiento";
+
 export const SimuladorWhatsApp = () => {
+  const [modulo, setModulo] = useState<Modulo>("turnos");
+  const chats = modulo === "turnos" ? CHATS : CHATS_AGENDA;
   const [activoId, setActivoId] = useState<string>(CHATS[0]?.id ?? "");
-  const activo = CHATS.find((c) => c.id === activoId) ?? CHATS[0];
+  const activo = chats.find((c) => c.id === activoId) ?? chats[0];
+
+  const cambiarModulo = (m: Modulo) => {
+    setModulo(m);
+    const lista = m === "turnos" ? CHATS : CHATS_AGENDA;
+    setActivoId(lista[0]?.id ?? "");
+  };
 
   return (
     <>
@@ -49,8 +60,25 @@ export const SimuladorWhatsApp = () => {
             </div>
           </div>
 
+          {/* Selector de módulo */}
+          <div className="flex gap-1 border-b border-gray-200 p-2 dark:border-gray-800">
+            {(["turnos", "agendamiento"] as Modulo[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => cambiarModulo(m)}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  modulo === m
+                    ? "bg-brand-500 text-white"
+                    : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+                }`}
+              >
+                {m === "turnos" ? "Turnos" : "Agendamiento"}
+              </button>
+            ))}
+          </div>
+
           <ul className="flex-1 overflow-y-auto">
-            {CHATS.map((chat) => {
+            {chats.map((chat) => {
               const activoItem = chat.id === activo?.id;
               return (
                 <li key={chat.id}>

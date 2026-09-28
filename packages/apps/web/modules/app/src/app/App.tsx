@@ -10,7 +10,7 @@ import { RecepcionPage } from "@/pages/recepcion";
 import { SurveyPage } from "@/pages/survey";
 import { EncuestasPage, EncuestaCompartir } from "@/pages/encuestas";
 import { DisplayScreen } from "@/pages/display";
-import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage } from "@/pages/agendamiento";
+import { AgendaPage, ProfesionalesPage, CalendarioPage, CitaDetallePage, CrearCitaPage, AnaliticaPage, ChatsPage } from "@/pages/agendamiento";
 import { SeleccionarPage } from "@/pages/seleccionar";
 import { ConfiguracionTurnosPage, ConfiguracionPage } from "@/pages/configuracion";
 import { SimuladorWhatsApp } from "@/pages/simulador";
@@ -162,6 +162,7 @@ export default function App() {
         <Route path="/agendamiento/calendario" element={<SeccionGuard seccion="calendario"><CalendarioPage /></SeccionGuard>} />
         <Route path="/agendamiento/detalles" element={<SeccionGuard seccion="agenda"><CitaDetallePage /></SeccionGuard>} />
         <Route path="/agendamiento/crear" element={<SeccionGuard seccion="crear"><CrearCitaPage /></SeccionGuard>} />
+        <Route path="/agendamiento/chats" element={<SeccionGuard seccion="chats"><ChatsPage /></SeccionGuard>} />
         <Route path="/agendamiento/analitica" element={<SeccionGuard seccion="analitica"><Analitica /></SeccionGuard>} />
         {/* Solo admin — un operador simulado nunca tiene esta "sección", así que
             SeccionGuard muestra el aviso de sin acceso si intenta entrar por URL */}

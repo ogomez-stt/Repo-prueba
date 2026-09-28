@@ -132,7 +132,7 @@ export const OperadorInicioAgenda = observer(() => {
         <PageMeta title="Inicio" description="Tu espacio de trabajo" />
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Hola, {operador?.nombre ?? "Operador"}</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Operador de Agendamiento</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{sessionStore.isProfesional ? "Mi agenda" : "Operador de Agendamiento"}</p>
         </div>
         <Card>
           <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -150,7 +150,7 @@ export const OperadorInicioAgenda = observer(() => {
       {/* Encabezado personal */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Hola, {operador?.nombre ?? "Operador"}</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Operador de Agendamiento</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{sessionStore.isProfesional ? "Mi agenda" : "Operador de Agendamiento"}</p>
       </div>
 
       {/* Selector de profesionales (solo si hay varios) */}

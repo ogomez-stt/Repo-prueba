@@ -15,3 +15,6 @@ export type { Modulo, Rol } from '@/stores/session.store';
 
 export { operadoresStore, OperadoresStore, SECCIONES } from '@/stores/operadores.store';
 export type { Operador, OperadorEstado, Seccion, OperadorStats, EncuestaStats } from '@/stores/operadores.store';
+
+export { asesorChatsStore, AsesorChatsStore } from '@/stores/asesorChats.store';
+export type { Conversacion, ChatMensajeAsesor, ChatEstado, ChatAutor } from '@/stores/asesorChats.store';

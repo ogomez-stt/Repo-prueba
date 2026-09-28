@@ -53,7 +53,9 @@ const OperadorChip = observer(() => {
         {iniciales}
       </span>
       <div className="hidden leading-tight sm:block">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-brand-500 dark:text-brand-400">Operando como</p>
+        <p className="text-[10px] font-medium uppercase tracking-wide text-brand-500 dark:text-brand-400">
+          {sessionStore.isProfesional ? "Profesional" : "Operando como"}
+        </p>
         <p className="text-xs font-semibold text-gray-800 dark:text-white/90">{op.nombre}</p>
       </div>
     </div>

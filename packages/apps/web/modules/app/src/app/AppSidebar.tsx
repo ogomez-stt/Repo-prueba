@@ -19,6 +19,7 @@ import {
   PlusIcon,
   PieChartIcon,
   GroupIcon,
+  ChatIcon,
 } from "@/icons";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -207,6 +208,7 @@ const SidebarContent = observer(() => {
               {puede("agenda") && <MenuItem icon={<ListIcon />} name="Agenda" path="/agendamiento" isActive={isActive} />}
               {puede("calendario") && <MenuItem icon={<CalenderIcon />} name="Calendario" path="/agendamiento/calendario" isActive={isActive} />}
               {puede("crear") && <MenuItem icon={<PlusIcon />} name="Agendar cita" path="/agendamiento/crear" isActive={isActive} />}
+              {puede("chats") && <MenuItem icon={<ChatIcon />} name="Chats" path="/agendamiento/chats" isActive={isActive} />}
               {puede("analitica") && <MenuItem icon={<PieChartIcon />} name="Analítica" path="/agendamiento/analitica" isActive={isActive} />}
               {sessionStore.isAdmin && (
                 <MenuItem icon={<GroupIcon />} name="Operadores" path="/agendamiento/operadores" isActive={isActive} />

@@ -1,5 +1,6 @@
 import { makeAutoObservable } from "mobx";
-import { operadoresStore, SECCIONES } from "@/stores/operadores.store";
+import { operadoresStore, SECCIONES, type Operador } from "@/stores/operadores.store";
+import { agendaStore } from "@/stores/agenda.store";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -25,6 +26,7 @@ interface SessionSnapshot {
   modulos: Modulo[];
   rol: Rol | null;
   operadorSimuladoId: string | null;
+  profesionalSimuladoId: string | null;
 }
 
 function loadSession(): SessionSnapshot {
@@ -36,12 +38,13 @@ function loadSession(): SessionSnapshot {
         modulos: Array.isArray(s.modulos) ? s.modulos : [],
         rol: s.rol ?? null,
         operadorSimuladoId: s.operadorSimuladoId ?? null,
+        profesionalSimuladoId: s.profesionalSimuladoId ?? null,
       };
     }
   } catch {
     // Sin localStorage o JSON inválido: sesión vacía.
   }
-  return { modulos: [], rol: null, operadorSimuladoId: null };
+  return { modulos: [], rol: null, operadorSimuladoId: null, profesionalSimuladoId: null };
 }
 
 function persistSession(s: SessionSnapshot): void {
@@ -81,12 +84,21 @@ export class SessionStore {
    */
   operadorSimuladoId: string | null = null;
 
+  /**
+   * Id del PROFESIONAL que se está simulando (mock, opción A). Un profesional
+   * entra como un "operador ligado a sí mismo": ve solo SUS citas, agenda,
+   * calendario y puede crear citas; sin gestión ni analítica ni otros
+   * profesionales. Cuando no es null, la app corre como ese profesional.
+   */
+  profesionalSimuladoId: string | null = null;
+
   constructor() {
     // Restaura la sesión guardada (sobrevive a recargas de página).
     const s = loadSession();
     this.modulos = s.modulos;
     this.rol = s.rol;
     this.operadorSimuladoId = s.operadorSimuladoId;
+    this.profesionalSimuladoId = s.profesionalSimuladoId;
     makeAutoObservable(this);
   }
 
@@ -96,6 +108,7 @@ export class SessionStore {
       modulos: this.modulos,
       rol: this.rol,
       operadorSimuladoId: this.operadorSimuladoId,
+      profesionalSimuladoId: this.profesionalSimuladoId,
     });
   }
 
@@ -159,13 +172,46 @@ export class SessionStore {
 
   // ── Simulación de operador ────────────────────────────────────────────────
 
-  /** true si la app está corriendo en modo "simular operador". */
+  /** true si la app está corriendo en modo "simular operador" o profesional. */
   get isSimulando() {
-    return this.operadorSimuladoId !== null;
+    return this.operadorSimuladoId !== null || this.profesionalSimuladoId !== null;
   }
 
-  /** El operador que se está simulando (o null). */
-  get operadorSimulado() {
+  /** true si se está simulando un profesional (opción A). */
+  get isProfesional() {
+    return this.profesionalSimuladoId !== null;
+  }
+
+  /** El profesional que se está simulando (o null). */
+  get profesionalSimulado() {
+    if (!this.profesionalSimuladoId) return null;
+    return agendaStore.getProfesional(this.profesionalSimuladoId) ?? null;
+  }
+
+  /**
+   * El "operador" activo en modo simulación. Puede ser:
+   * - un operador real (simular operador), o
+   * - un operador SINTÉTICO derivado del profesional simulado (opción A):
+   *   ligado solo a sí mismo y con permisos acotados (inicio, agenda,
+   *   calendario, crear). Así reutilizamos todo el filtrado por profesional.
+   */
+  get operadorSimulado(): Operador | null {
+    if (this.profesionalSimuladoId) {
+      const prof = agendaStore.getProfesional(this.profesionalSimuladoId);
+      if (!prof) return null;
+      return {
+        id: `prof:${prof.id}`,
+        nombre: prof.nombre,
+        email: "",
+        telefono: "",
+        estado: "activo",
+        modulo: "agendamiento",
+        // Un profesional ve su inicio, agenda, calendario y puede crear citas.
+        permisos: ["inicio", "agenda", "calendario", "crear"],
+        profesionalIds: [prof.id],
+        colaIds: [],
+      };
+    }
     if (!this.operadorSimuladoId) return null;
     return operadoresStore.operadores.find((o) => o.id === this.operadorSimuladoId) ?? null;
   }
@@ -279,8 +325,24 @@ export class SessionStore {
     const op = operadoresStore.operadores.find((o) => o.id === operadorId);
     if (!op) return;
     this.operadorSimuladoId = operadorId;
+    this.profesionalSimuladoId = null;
     this.rol = "operador";
     this.modulos = [op.modulo];
+    this.persist();
+  }
+
+  /**
+   * Entra en modo simulación como un PROFESIONAL (opción A). La app corre como
+   * un operador ligado solo a ese profesional: ve su agenda/calendario/citas y
+   * puede crear citas, sin gestión ni analítica ni otros profesionales.
+   */
+  simularProfesional(profesionalId: string) {
+    const prof = agendaStore.getProfesional(profesionalId);
+    if (!prof) return;
+    this.profesionalSimuladoId = profesionalId;
+    this.operadorSimuladoId = null;
+    this.rol = "operador";
+    this.modulos = ["agendamiento"];
     this.persist();
   }
 
@@ -294,6 +356,7 @@ export class SessionStore {
     this.modulos = [];
     this.rol = null;
     this.operadorSimuladoId = null;
+    this.profesionalSimuladoId = null;
     this.persist();
   }
 }
