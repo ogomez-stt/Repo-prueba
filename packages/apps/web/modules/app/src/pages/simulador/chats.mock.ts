@@ -35,6 +35,13 @@ export interface Chat {
   /** Etiqueta corta del escenario, para la lista de chats. */
   escenario: string;
   mensajes: ChatMensaje[];
+  /**
+   * Si está presente, este chat se conecta EN VIVO con la bandeja de Chats de
+   * asesor (Agendamiento): tras el guion inicial, el cliente puede escribir y
+   * las respuestas del asesor aparecen aquí (bidireccional, vía asesorChatsStore).
+   * `motivo` es la etiqueta con la que entra a la bandeja.
+   */
+  asesorEnVivo?: { motivo: string };
 }
 
 /**

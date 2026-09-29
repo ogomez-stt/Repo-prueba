@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { observer } from "mobx-react-lite";
 import { PageMeta } from "@/shell/meta";
+import { asesorChatsStore, type Conversacion } from "@/stores";
 import { CHATS, type Chat, type ChatMensaje } from "./chats.mock";
 import { CHATS_AGENDA } from "./chatsAgenda.mock";
 
@@ -33,16 +35,44 @@ const ultimoTexto = (chat: Chat) => {
  */
 type Modulo = "turnos" | "agendamiento";
 
-export const SimuladorWhatsApp = () => {
+export const SimuladorWhatsApp = observer(() => {
   const [modulo, setModulo] = useState<Modulo>("turnos");
   const chats = modulo === "turnos" ? CHATS : CHATS_AGENDA;
   const [activoId, setActivoId] = useState<string>(CHATS[0]?.id ?? "");
   const activo = chats.find((c) => c.id === activoId) ?? chats[0];
 
+  // Borrador del mensaje del cliente (solo en chats con asesor en vivo).
+  const [borrador, setBorrador] = useState("");
+
   const cambiarModulo = (m: Modulo) => {
     setModulo(m);
     const lista = m === "turnos" ? CHATS : CHATS_AGENDA;
     setActivoId(lista[0]?.id ?? "");
+  };
+
+  // ── Asesor en vivo (conexión bidireccional con la bandeja de Chats) ──
+  // Si el chat activo está marcado, buscamos su conversación en el store por
+  // teléfono. Puede no existir aún (el cliente todavía no solicitó asesor).
+  const esAsesor = !!activo?.asesorEnVivo;
+  const conv: Conversacion | undefined = esAsesor
+    ? asesorChatsStore.porTelefono(activo.telefono)
+    : undefined;
+
+  const solicitarAsesor = () => {
+    if (!activo?.asesorEnVivo) return;
+    const id = asesorChatsStore.ingresarDesdeWhatsApp({
+      cliente: activo.nombre,
+      telefono: activo.telefono,
+      motivo: activo.asesorEnVivo.motivo,
+      primerMensaje: "Hola, necesito ayuda de un asesor por favor 🙏",
+    });
+    void id;
+  };
+
+  const enviarCliente = () => {
+    if (!conv || !borrador.trim()) return;
+    asesorChatsStore.mensajeCliente(conv.id, borrador);
+    setBorrador("");
   };
 
   return (
@@ -126,24 +156,80 @@ export const SimuladorWhatsApp = () => {
                   <p className="mx-auto mb-2 rounded-full bg-white/70 px-3 py-1 text-center text-xs text-gray-500 shadow-sm dark:bg-gray-900/70 dark:text-gray-400">
                     Conversación simulada · {activo.escenario}
                   </p>
+
+                  {/* Guion inicial (siempre) */}
                   {activo.mensajes.map((m, i) => <Burbuja key={i} m={m} />)}
+
+                  {/* Hilo EN VIVO de la bandeja de asesor (bidireccional) */}
+                  {esAsesor && conv && (
+                    <>
+                      <p className="mx-auto my-2 rounded-full bg-brand-500/10 px-3 py-1 text-center text-xs font-medium text-brand-600 dark:text-brand-400">
+                        {asesorChatsStore.estadoLabel(conv.estado)}
+                      </p>
+                      {conv.mensajes.map((m) => <BurbujaViva key={m.id} m={m} />)}
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Barra deshabilitada de solo lectura */}
-              <div className="border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
-                <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5 text-sm text-gray-400 dark:bg-gray-800">
-                  <LockIcon />
-                  Vista de solo lectura (simulación)
+              {/* Barra inferior: solo lectura, o interactiva si es chat de asesor */}
+              {esAsesor ? (
+                <div className="border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
+                  {!conv ? (
+                    // Todavía no solicitó asesor: botón para transferir a la bandeja.
+                    <button
+                      onClick={solicitarAsesor}
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                    >
+                      <AgentIcon />
+                      Solicitar hablar con un asesor
+                    </button>
+                  ) : conv.estado === "resuelto" ? (
+                    <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5 text-sm text-gray-400 dark:bg-gray-800">
+                      <LockIcon />
+                      El asesor marcó la conversación como resuelta
+                    </div>
+                  ) : (
+                    // Conversación abierta: el cliente puede escribir (va a la bandeja).
+                    <div className="flex items-end gap-2">
+                      <textarea
+                        value={borrador}
+                        onChange={(e) => setBorrador(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            enviarCliente();
+                          }
+                        }}
+                        rows={1}
+                        placeholder="Escribe como cliente…"
+                        className="max-h-28 min-h-[2.75rem] flex-1 resize-none rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                      />
+                      <button
+                        onClick={enviarCliente}
+                        disabled={!borrador.trim()}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+                      >
+                        <SendIcon />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="border-t border-gray-200 bg-white px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
+                  <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2.5 text-sm text-gray-400 dark:bg-gray-800">
+                    <LockIcon />
+                    Vista de solo lectura (simulación)
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>
       </div>
     </>
   );
-};
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BURBUJA
@@ -184,9 +270,56 @@ const Burbuja = ({ m }: { m: ChatMensaje }) => {
   );
 };
 
+/**
+ * BurbujaViva — burbuja del hilo EN VIVO (store de asesor). En el simulador, el
+ * cliente va a la derecha (verde), el asesor a la izquierda (blanco) y los
+ * mensajes de sistema al centro.
+ */
+const BurbujaViva = ({ m }: { m: { autor: "cliente" | "asesor" | "sistema"; texto: string; hora: string } }) => {
+  if (m.autor === "sistema") {
+    return (
+      <p className="mx-auto w-fit rounded-full bg-white/70 px-3 py-1 text-center text-xs text-gray-500 shadow-sm dark:bg-gray-900/70 dark:text-gray-400">
+        {m.texto} · {m.hora}
+      </p>
+    );
+  }
+  const esCliente = m.autor === "cliente";
+  return (
+    <div className={`flex ${esCliente ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[80%] rounded-2xl px-3 py-2 shadow-sm ${
+          esCliente
+            ? "rounded-br-sm bg-[#d9fdd3] text-gray-800 dark:bg-brand-500/30 dark:text-white/90"
+            : "rounded-bl-sm bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90"
+        }`}
+      >
+        {!esCliente && (
+          <p className="mb-0.5 text-[10px] font-semibold text-brand-600 dark:text-brand-400">Asesor</p>
+        )}
+        <p className="whitespace-pre-line text-sm leading-relaxed">{m.texto}</p>
+        <p className={`mt-1 text-right text-[10px] ${esCliente ? "text-gray-500 dark:text-white/50" : "text-gray-400"}`}>
+          {m.hora}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ICONS
 // ═══════════════════════════════════════════════════════════════════════════
+
+const AgentIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0" />
+  </svg>
+);
+
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-5 w-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.27 3.5a.6.6 0 01.82-.72l16.5 8.25a.6.6 0 010 1.08L4.09 20.4a.6.6 0 01-.82-.72L6 12zm0 0h6" />
+  </svg>
+);
 
 const WhatsAppMark = () => (
   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-success-500 text-white">

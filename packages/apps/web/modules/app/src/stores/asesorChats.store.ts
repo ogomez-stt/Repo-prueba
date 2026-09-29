@@ -140,10 +140,32 @@ export class AsesorChatsStore {
 
   constructor() {
     makeAutoObservable(this);
+    this.escucharOtrasPestanas();
   }
 
   private persist() {
     persistChats(this.conversaciones);
+  }
+
+  /**
+   * Sincronización entre pestañas (mock, sin backend). El simulador de WhatsApp
+   * (teléfono del cliente) y la bandeja de NECTO (asesor) viven en pestañas
+   * distintas; cuando una escribe en localStorage, la otra recibe el evento
+   * `storage` y recarga las conversaciones para reflejar el cambio en vivo.
+   */
+  private escucharOtrasPestanas(): void {
+    if (typeof window === "undefined") return;
+    window.addEventListener("storage", (e) => {
+      if (e.key !== CHATS_KEY || e.newValue == null) return;
+      try {
+        const fresco = JSON.parse(e.newValue) as Conversacion[];
+        runInAction(() => {
+          this.conversaciones = fresco;
+        });
+      } catch {
+        // JSON inválido: ignorar.
+      }
+    });
   }
 
   // ── Lookups / derivados ──
@@ -174,6 +196,22 @@ export class AsesorChatsStore {
 
   get totalNoLeidos(): number {
     return this.conversaciones.reduce((s, c) => s + c.noLeidos, 0);
+  }
+
+  /** Busca la conversación de un cliente por teléfono (para el simulador). */
+  porTelefono(telefono: string): Conversacion | undefined {
+    return this.conversaciones.find((c) => c.telefono === telefono);
+  }
+
+  getConversacion(id: string): Conversacion | undefined {
+    return this.conversaciones.find((c) => c.id === id);
+  }
+
+  /** Etiqueta legible del estado (para el simulador y avisos). */
+  estadoLabel(estado: ChatEstado): string {
+    return estado === "sin_asignar" ? "Esperando un asesor"
+      : estado === "en_curso" ? "Un asesor te está atendiendo"
+      : "Conversación resuelta";
   }
 
   // ── Acciones ──
@@ -240,10 +278,22 @@ export class AsesorChatsStore {
   }
 
   /**
-   * Ingreso de un chat nuevo desde el canal de WhatsApp (cliente pide asesor).
-   * Lo usa el simulador para alimentar la bandeja. Entra como sin_asignar.
+   * Ingreso de un chat desde el canal de WhatsApp (cliente pide asesor).
+   * Idempotente por teléfono: si ya existe la conversación de ese cliente, la
+   * reutiliza (agrega el mensaje al hilo existente); si no, la crea como
+   * sin_asignar. Devuelve el id de la conversación (nueva o existente).
    */
   ingresarDesdeWhatsApp(data: { cliente: string; telefono: string; motivo: string; primerMensaje: string }): string {
+    const existente = this.porTelefono(data.telefono);
+    if (existente) {
+      // Reutiliza: agrega el mensaje del cliente al hilo actual.
+      runInAction(() => {
+        existente.mensajes.push({ id: crypto.randomUUID(), autor: "cliente", texto: data.primerMensaje, hora: nowHora() });
+        existente.noLeidos += 1;
+      });
+      this.persist();
+      return existente.id;
+    }
     const id = crypto.randomUUID();
     this.conversaciones.unshift({
       id,
@@ -258,6 +308,22 @@ export class AsesorChatsStore {
     });
     this.persist();
     return id;
+  }
+
+  /**
+   * El CLIENTE escribe desde el simulador de WhatsApp. Aparece en ambos lados
+   * (simulador y bandeja) porque comparten este store. Suma un no-leído para
+   * que el asesor lo note en la lista.
+   */
+  mensajeCliente(id: string, texto: string): void {
+    const c = this.conversaciones.find((x) => x.id === id);
+    if (!c || !texto.trim()) return;
+    runInAction(() => {
+      c.mensajes.push({ id: crypto.randomUUID(), autor: "cliente", texto: texto.trim(), hora: nowHora() });
+      // Solo suma no-leído si el asesor no la tiene abierta ahora mismo.
+      if (this.seleccionadaId !== id) c.noLeidos += 1;
+    });
+    this.persist();
   }
 
   // ── Modo demo ("desde 0") ──

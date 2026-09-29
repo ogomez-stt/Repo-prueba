@@ -78,6 +78,7 @@ export const CHATS_AGENDA: Chat[] = [
     nombre: "Marta Ruiz",
     telefono: "+57 300 111 2233",
     escenario: "Pidió hablar con un asesor",
+    asesorEnVivo: { motivo: "Duda sobre disponibilidad" },
     mensajes: [
       { autor: "cliente", texto: "Hola, quiero una cita con la Dra. Ana pero no veo horarios esta semana", hora: "09:10" },
       { autor: "bot", texto: "¡Hola Marta! 👋 La agenda de la Dra. Ana Gómez está llena esta semana. ¿Quieres que te muestre horarios de la próxima semana?", hora: "09:10" },
@@ -85,9 +86,9 @@ export const CHATS_AGENDA: Chat[] = [
       { autor: "bot", texto: "Entiendo que es urgente 🙏 Para revisar cupos especiales o una cita prioritaria, mejor te comunico con un *asesor humano* del equipo.", hora: "09:11" },
       { autor: "cliente", texto: "Sí por favor, quiero hablar con un asesor", hora: "09:11" },
       { autor: "bot", texto: "Perfecto. 📨 Transferí tu conversación a un asesor. En un momento alguien del equipo te responde por aquí mismo. Gracias por tu paciencia.", hora: "09:12" },
-      // A partir de aquí, el chat aparece en la bandeja de Chats de asesor
-      // (/agendamiento/chats) como "Sin asignar", donde un operador lo toma.
-      { autor: "bot", texto: "🧑‍💼 Un asesor tomó tu conversación y te responderá en breve.", hora: "09:13" },
+      // A partir de aquí (asesorEnVivo), el hilo se conecta EN VIVO con la
+      // bandeja de Chats (/agendamiento/chats): el cliente puede escribir y las
+      // respuestas del asesor aparecen aquí. Ver SimuladorWhatsApp.
     ],
   },
 ];
