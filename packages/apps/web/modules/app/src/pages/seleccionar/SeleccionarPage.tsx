@@ -5,7 +5,7 @@ import { PageMeta } from "@/shell/meta";
 import { Button } from "@/elements/ui/button";
 import { Card, CardTitle, CardDescription } from "@/elements/ui/card";
 import { ThemeToggleButton } from "@/shell";
-import { queuesStore, sessionStore, type Modulo, type Rol } from "@/stores";
+import { agendaStore, queuesStore, sessionStore, type Modulo, type Rol } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ICONS
@@ -188,11 +188,16 @@ export const SeleccionarPage = observer(() => {
     setModulos((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
   };
 
+  // ¿Hay onboarding pendiente para alguno de los módulos elegidos? (prueba "desde 0")
+  const onboardingActivo = (mods: Modulo[]) =>
+    (mods.includes("turnos") && queuesStore.onboardingPendiente) ||
+    (mods.includes("agendamiento") && agendaStore.onboardingPendiente);
+
   const goToRol = () => {
     if (modulos.length === 0) return;
     // Prueba "Simular inicio desde 0": ya sabemos que somos administradores, así
     // que nos saltamos el paso de rol y confirmamos directo como admin.
-    if (queuesStore.onboardingPendiente) {
+    if (onboardingActivo(modulos)) {
       entrar(modulos, "administrador");
       return;
     }
@@ -211,10 +216,15 @@ export const SeleccionarPage = observer(() => {
       return;
     }
 
-    // Onboarding de configuracion: SOLO cuando se activo "Simular inicio desde 0"
-    // (es una prueba). El inicio normal nunca pasa por aqui.
+    // Onboarding de configuracion: SOLO cuando se activo "Simular inicio desde 0".
+    // Si eligió ambos y ambos están pendientes, empieza por Turnos; al finalizar
+    // Turnos, ese onboarding encadena a Agendamiento.
     if (mods.includes("turnos") && queuesStore.onboardingPendiente) {
       navigate("/configuracion-turnos");
+      return;
+    }
+    if (mods.includes("agendamiento") && agendaStore.onboardingPendiente) {
+      navigate("/configuracion-agendamiento");
       return;
     }
 

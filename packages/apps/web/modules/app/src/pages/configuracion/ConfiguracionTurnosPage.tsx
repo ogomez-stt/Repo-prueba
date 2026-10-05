@@ -15,6 +15,7 @@ import { ThemeToggleButton } from "@/shell";
 import { HorarioNegocio } from "@/pages/configuracion/HorarioNegocio";
 import { ReglasTurnos } from "@/pages/configuracion/ReglasTurnos";
 import {
+  agendaStore,
   operadoresStore,
   queuesStore,
   sessionStore,
@@ -310,6 +311,12 @@ export const ConfiguracionTurnosPage = observer(() => {
 
   const finalizar = () => {
     queuesStore.guardarConfig({ ...datosEmpresa(), tipoNegocio: tipo ?? "otro" });
+    // Si el usuario también eligió Agendamiento y su onboarding sigue pendiente,
+    // encadena a la configuración de Agendamiento antes de entrar al módulo.
+    if (sessionStore.hasModulo("agendamiento") && agendaStore.onboardingPendiente) {
+      navigate("/configuracion-agendamiento");
+      return;
+    }
     navigate(sessionStore.moduloEntryPath);
   };
 

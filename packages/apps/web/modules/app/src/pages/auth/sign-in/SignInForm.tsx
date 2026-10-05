@@ -47,7 +47,10 @@ export default function SignInForm() {
     queuesStore.iniciarDesdeCero();
     operadoresStore.iniciarDesdeCero();
     agendaStore.iniciarDesdeCero();
+    // Activa el onboarding de AMBOS módulos; el destino real depende de lo que
+    // el usuario elija en /seleccionar (Turnos, Agendamiento o ambos).
     queuesStore.activarOnboarding();
+    agendaStore.activarOnboarding();
     // Pasa por la selección de MÓDULO, pero se salta la de rol: en esta prueba
     // ya sabemos que somos administradores.
     navigate("/seleccionar");

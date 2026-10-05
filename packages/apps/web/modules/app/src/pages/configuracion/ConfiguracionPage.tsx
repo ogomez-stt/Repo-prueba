@@ -12,7 +12,9 @@ import { Alert } from "@/elements/ui/alert";
 import { queuesStore } from "@/stores";
 import { HorarioNegocio } from "@/pages/configuracion/HorarioNegocio";
 import { ReglasTurnos } from "@/pages/configuracion/ReglasTurnos";
+import { ReglasCitas } from "@/pages/configuracion/ReglasCitas";
 import { ConfigDisplay } from "@/pages/configuracion/ConfigDisplay";
+import { sessionStore } from "@/stores";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ICONS
@@ -92,6 +94,12 @@ export const ConfiguracionPage = observer(() => {
 
   // Marca el formulario como "sucio" al editar cualquier campo (oculta el aviso).
   const touched = () => guardado && setGuardado(false);
+
+  // Qué apartados mostrar según los módulos del negocio. Sin selección aún
+  // (ej. admin recién entrado) → muestra ambos.
+  const sinSeleccion = sessionStore.modulos.length === 0;
+  const verTurnos = sinSeleccion || sessionStore.hasModulo("turnos");
+  const verAgendamiento = sinSeleccion || sessionStore.hasModulo("agendamiento");
 
   return (
     <>
@@ -237,44 +245,64 @@ export const ConfiguracionPage = observer(() => {
             </div>
           </Card>
 
-          {/* ── Reglas de turnos ── */}
-          <Card>
-            <CardTitle>Reglas de turnos</CardTitle>
-            <CardDescription>
-              Define el prefijo del número de turno (inicial de la fila o uno fijo), si la numeración
-              se reinicia cada día, a los cuántos minutos un turno se marca como urgente y desde cuántas
-              personas en espera una fila se considera ocupada o llena. Estos son los valores por defecto:
-              cada fila puede tener los suyos desde su edición. Los cambios se guardan al instante.
-            </CardDescription>
-            <div className="mt-6">
-              <ReglasTurnos />
-            </div>
-          </Card>
-
-          {/* ── Pantalla de sala (Display) ── */}
-          <Card>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Pantalla de sala (Display)</CardTitle>
+          {/* ── Turnos: reglas + display (solo si el negocio usa Turnos) ── */}
+          {verTurnos && (
+            <>
+              <Card>
+                <CardTitle>Reglas de turnos</CardTitle>
                 <CardDescription>
-                  Personaliza la pantalla pública que ven los clientes en la sala: sonido al llamar,
-                  si se muestra el nombre, cuántos turnos siguientes listar, el logo y un mensaje al pie.
-                  Los cambios se guardan al instante.
+                  Define el prefijo del número de turno (inicial de la fila o uno fijo), si la numeración
+                  se reinicia cada día, a los cuántos minutos un turno se marca como urgente y desde cuántas
+                  personas en espera una fila se considera ocupada o llena. Estos son los valores por defecto:
+                  cada fila puede tener los suyos desde su edición. Los cambios se guardan al instante.
                 </CardDescription>
+                <div className="mt-6">
+                  <ReglasTurnos />
+                </div>
+              </Card>
+
+              {/* ── Pantalla de sala (Display) ── */}
+              <Card>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Pantalla de sala (Display)</CardTitle>
+                    <CardDescription>
+                      Personaliza la pantalla pública que ven los clientes en la sala: sonido al llamar,
+                      si se muestra el nombre, cuántos turnos siguientes listar, el logo y un mensaje al pie.
+                      Los cambios se guardan al instante.
+                    </CardDescription>
+                  </div>
+                  <a
+                    href="/display"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hidden shrink-0 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] sm:inline-block"
+                  >
+                    Ver pantalla
+                  </a>
+                </div>
+                <div className="mt-6">
+                  <ConfigDisplay />
+                </div>
+              </Card>
+            </>
+          )}
+
+          {/* ── Agendamiento: reglas de citas (solo si el negocio usa Agendamiento) ── */}
+          {verAgendamiento && (
+            <Card>
+              <CardTitle>Reglas de citas (Agendamiento)</CardTitle>
+              <CardDescription>
+                Define la duración por defecto de las citas, la modalidad (presencial/virtual), con cuánta
+                antelación se envía el recordatorio al cliente y si puede cancelar o reagendar por WhatsApp.
+                La disponibilidad concreta (días y horas) se configura en cada profesional. Los cambios se
+                guardan al instante.
+              </CardDescription>
+              <div className="mt-6">
+                <ReglasCitas />
               </div>
-              <a
-                href="/display"
-                target="_blank"
-                rel="noreferrer"
-                className="hidden shrink-0 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/[0.03] sm:inline-block"
-              >
-                Ver pantalla
-              </a>
-            </div>
-            <div className="mt-6">
-              <ConfigDisplay />
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
       </BasePageLayout>
     </>

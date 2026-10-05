@@ -52,6 +52,69 @@ Notas:
 
 ---
 
+## 1b. Configuración inicial del negocio (onboarding "desde 0")
+
+Igual que Turnos, Agendamiento tiene un **wizard de configuración inicial** que
+ve el administrador la primera vez que crea el módulo. Se dispara solo desde el
+botón **"Simular inicio desde 0"** del login (prueba); el inicio normal nunca
+pasa por él. Ruta: `/configuracion-agendamiento`.
+
+```mermaid
+flowchart LR
+  P1["1 · Negocio: logo imagen, nombre,<br/>descripción, tel, correo, dirección"] --> P2["2 · Horario: días y franjas de atención"]
+  P2 --> P3["3 · Tipo de negocio: preajuste<br/>con profesionales precargados"]
+  P3 --> P4["4 · Profesionales: revisar/añadir/editar<br/>+ disponibilidad por profesional"]
+  P4 --> P5["5 · Reglas de citas: duración, modalidad,<br/>recordatorio, cancelar por WhatsApp"]
+  P5 --> P6["6 · Operarios: opcional · cada uno<br/>ligado a ≥ 1 profesional"]
+  P6 --> P7["7 · Previsualización: resumen completo"]
+  P7 --> OK["Confirmar y entrar → /agendamiento/inicio"]
+```
+
+Detalle de cada paso:
+1. **Negocio** — logo (imagen/data URL), nombre (requerido), descripción,
+   teléfono, correo y dirección. **Se comparten con Turnos** (mismo negocio,
+   `queuesStore.businessConfig`).
+2. **Horario de atención** — por día: abierto/cerrado + franja. Compartido con
+   Turnos (`HorarioNegocio`). Se guarda al instante.
+3. **Tipo de negocio (preajuste)** — Clínica/Salud, Estética/Salón,
+   Consultoría/Servicios, Educación/Clases u Otro. Cada tipo **precarga
+   profesionales sugeridos** con su disponibilidad (p. ej. Clínica → Psicología,
+   Nutrición). "Otro" empieza sin profesionales.
+4. **Profesionales** — lista precargada; se pueden **eliminar, agregar o
+   editar**. El editor define nombre, especialidad, días de atención, franja
+   horaria y duración de bloque (30/60 min).
+5. **Reglas de citas** — duración por defecto, modalidad por defecto
+   (presencial/virtual), antelación del recordatorio y si el cliente puede
+   cancelar/reagendar por WhatsApp. Persistidas en `necto.agendaRules`.
+6. **Operarios** — opcional (se puede omitir). Cada operario se liga a **mínimo
+   un profesional** (obligatorio).
+7. **Previsualización** — resumen amplio (negocio, reglas, profesionales,
+   operarios) antes de confirmar.
+
+### Flujo "desde 0" con dos módulos
+
+```mermaid
+flowchart TD
+  A["Login → Simular inicio desde 0"] --> B["Vacía datos + activa onboarding<br/>de Turnos y Agendamiento"]
+  B --> C["/seleccionar: elegir módulo(s)"]
+  C --> D{"¿Qué eligió?"}
+  D -- Solo Turnos --> T["/configuracion-turnos → módulo"]
+  D -- Solo Agendamiento --> G["/configuracion-agendamiento → módulo"]
+  D -- Ambos --> T2["/configuracion-turnos"]
+  T2 --> G2["al finalizar Turnos<br/>encadena a /configuracion-agendamiento"]
+  G2 --> FIN["Entra al módulo"]
+```
+
+- "Simular inicio desde 0" activa el onboarding de **ambos** módulos; el destino
+  depende de lo que el usuario elija en `/seleccionar`.
+- Si elige **ambos**, primero configura Turnos y al finalizar se **encadena** a
+  la configuración de Agendamiento.
+- La configuración permanente se edita luego desde **`/configuracion`** (sidebar):
+  datos del negocio y horario (compartidos), reglas de turnos + display (si usa
+  Turnos) y reglas de citas (si usa Agendamiento).
+
+---
+
 ## 2. Vistas del módulo por rol
 
 ```mermaid
@@ -351,12 +414,47 @@ Los 4 escenarios de Agendamiento en `/wa`:
 
 ---
 
-## 13. Bandeja de Chats de asesor
+## 13. Bandeja de Chats de asesor (conexión en vivo)
 
 Cuando un cliente pide "hablar con un asesor" (chat 4), su conversación entra a
 la **bandeja de Chats** (`/agendamiento/chats`). Un operador la toma, responde y
 la marca como resuelta. Vista construida con el flujo Elements (ChatBox /
 ChatSidebar / Tabs).
+
+### 13.1 Dos mundos, una misma conversación
+
+El **simulador `/wa`** representa el **teléfono del cliente** (mundo externo al
+que NECTO no tiene acceso). La **bandeja `/agendamiento/chats`** es el lado de
+NECTO (el asesor). Son **dos pestañas distintas** que comparten la misma
+conversación y se sincronizan **en vivo**.
+
+```mermaid
+sequenceDiagram
+  actor C as Cliente (teléfono /wa)
+  participant LS as localStorage<br/>necto.asesorChats
+  actor O as Asesor (NECTO /agendamiento/chats)
+
+  C->>LS: "Solicitar asesor" → crea la conversación (sin asignar)
+  LS-->>O: aparece en la bandeja (evento storage)
+  O->>LS: "Tomar chat" (en curso) + mensaje de sistema
+  LS-->>C: el teléfono muestra "Un asesor te está atendiendo"
+  C->>LS: el cliente escribe
+  LS-->>O: el mensaje aparece en la bandeja (no leído)
+  O->>LS: el asesor responde
+  LS-->>C: la respuesta aparece en el teléfono
+  O->>LS: "Marcar resuelto"
+  LS-->>C: el teléfono muestra "Conversación resuelta"
+```
+
+- Ambas pestañas leen/escriben el mismo `asesorChatsStore`, persistido en
+  `localStorage` (`necto.asesorChats`). El evento `storage` del navegador
+  notifica a la otra pestaña, que **recarga** las conversaciones y MobX refresca
+  la UI al instante (sincronización mock, sin backend).
+- El botón **"Solicitar asesor"** del simulador es **idempotente por teléfono**:
+  si ya existe la conversación de ese cliente, agrega el mensaje al hilo; si no,
+  la crea.
+
+### 13.2 Estados de la conversación
 
 ```mermaid
 stateDiagram-v2
@@ -371,6 +469,8 @@ stateDiagram-v2
     ("Chat asignado a…", "Resuelto")
   end note
 ```
+
+### 13.3 Estructura de la bandeja
 
 ```mermaid
 flowchart LR
@@ -400,17 +500,25 @@ flowchart LR
 - Estado persistido en `localStorage` (`necto.asesorChats`); el modo "desde 0" la
   vacía de forma reversible.
 
+### 13.4 Lado del cliente en el simulador (/wa)
+
+- El chat de asesor (Marta Ruiz) arranca con un guion inicial (pide asesor) y
+  luego se **conecta en vivo**: aparece el botón **"Solicitar asesor"**, y una vez
+  solicitado se habilita un **input del cliente** y se muestran las respuestas del
+  asesor que llegan desde la bandeja.
+- Un aviso de estado refleja en todo momento en qué va: *Esperando un asesor* /
+  *Un asesor te está atendiendo* / *Conversación resuelta*.
+
 ---
 
 ## Pendientes (fuera del alcance actual, ya conocidos)
 
-- Integración real del bot de WhatsApp y de la bandeja de Chats (hoy simulados:
-  `/wa` guionizado y la bandeja alimentada por seed + acciones locales).
+- Integración real del bot de WhatsApp (hoy `/wa` es guionizado). La bandeja de
+  Chats ya sincroniza en vivo entre pestañas vía `localStorage` (mock); falta el
+  backend real (WebSocket/mensajería) que reemplace esa capa.
 - Login real del profesional (hoy se entra vía "Simular acceso → Profesional";
   cuando exista auth, el `profesionalId` se derivaría de su cuenta).
 - Compartir el formulario de agendar con el cliente (vista pública + apartado de
   compartir en Crear cita) — en discusión.
 - Backend real (hoy todo es mock + estado en memoria/localStorage).
-- Datos del negocio (nombre, logo, giro) y catálogo de servicios por profesional.
-- Configuración inicial (onboarding) del módulo de Agendamiento, equivalente al
-  de Turnos.
+- Catálogo de servicios por profesional (hoy la especialidad es un texto libre).

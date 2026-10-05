@@ -153,6 +153,116 @@ const seedCitas = (): Cita[] => [
 const ESTADO_ORDER: CitaEstado[] = ["pendiente", "confirmada", "completada", "cancelada", "noshow"];
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURACION DEL NEGOCIO — Agendamiento (onboarding "desde 0")
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Los DATOS del negocio (nombre, logo, contacto) y el HORARIO se comparten con
+// el módulo de Turnos vía queuesStore.businessConfig (el negocio es el mismo).
+// Aquí vive lo PROPIO de Agendamiento: el tipo de negocio (con profesionales
+// precargados) y las reglas de citas.
+
+/** Tipo de negocio de Agendamiento (define el preset de profesionales). */
+export type TipoNegocioAgenda = "clinica" | "estetica" | "consultoria" | "educacion" | "otro";
+
+/** Reglas globales de las citas del negocio (configurables en el onboarding). */
+export interface AgendaRules {
+  /** Duración por defecto de una cita nueva, en minutos. */
+  duracionDefault: number;
+  /** Modalidad por defecto al crear una cita. */
+  modalidadDefault: Modalidad;
+  /** Horas de antelación con las que se envía el recordatorio al cliente. */
+  recordatorioHoras: number;
+  /** Permitir que el cliente cancele/reagende por WhatsApp. */
+  permitirCancelarWhatsApp: boolean;
+}
+
+const DEFAULT_AGENDA_RULES: AgendaRules = {
+  duracionDefault: 30,
+  modalidadDefault: "presencial",
+  recordatorioHoras: 24,
+  permitirCancelarWhatsApp: true,
+};
+
+const AGENDA_RULES_KEY = "necto.agendaRules";
+
+function loadAgendaRules(): AgendaRules {
+  try {
+    const raw = localStorage.getItem(AGENDA_RULES_KEY);
+    if (raw) return { ...DEFAULT_AGENDA_RULES, ...JSON.parse(raw) };
+  } catch {
+    // Sin localStorage o JSON invalido: usa defaults.
+  }
+  return { ...DEFAULT_AGENDA_RULES };
+}
+
+function persistAgendaRules(r: AgendaRules): void {
+  try {
+    localStorage.setItem(AGENDA_RULES_KEY, JSON.stringify(r));
+  } catch {
+    // Sin localStorage: no-op (mock).
+  }
+}
+
+/** Profesional precargado por preset (sin id; se materializa al aplicar). */
+export interface PresetProfesional {
+  nombre: string;
+  especialidad: string;
+  config: CalendarConfig;
+}
+
+export interface AgendaPreset {
+  tipo: TipoNegocioAgenda;
+  label: string;
+  descripcion: string;
+  /** Profesionales que se precargan al elegir este preset. */
+  profesionales: PresetProfesional[];
+}
+
+/** Catálogo de presets por tipo de negocio (con profesionales precargados). */
+const AGENDA_PRESETS: AgendaPreset[] = [
+  {
+    tipo: "clinica",
+    label: "Clínica / Salud",
+    descripcion: "Consultas con profesionales de la salud.",
+    profesionales: [
+      { nombre: "Dra. Ana Gómez", especialidad: "Psicología", config: { diasLaborales: [1, 2, 3, 4, 5], horaInicio: 9, horaFin: 18, duracionSlot: 60 } },
+      { nombre: "Dr. Luis Peña", especialidad: "Nutrición", config: { diasLaborales: [1, 2, 3, 4, 5, 6], horaInicio: 8, horaFin: 14, duracionSlot: 30 } },
+    ],
+  },
+  {
+    tipo: "estetica",
+    label: "Estética / Salón",
+    descripcion: "Citas por servicio de belleza y bienestar.",
+    profesionales: [
+      { nombre: "Estilista principal", especialidad: "Corte y color", config: { diasLaborales: [2, 3, 4, 5, 6], horaInicio: 10, horaFin: 19, duracionSlot: 60 } },
+      { nombre: "Manicurista", especialidad: "Uñas", config: { diasLaborales: [2, 3, 4, 5, 6], horaInicio: 10, horaFin: 18, duracionSlot: 30 } },
+    ],
+  },
+  {
+    tipo: "consultoria",
+    label: "Consultoría / Servicios",
+    descripcion: "Asesorías y servicios profesionales por cita.",
+    profesionales: [
+      { nombre: "Asesor 1", especialidad: "Consultoría general", config: { diasLaborales: [1, 2, 3, 4, 5], horaInicio: 9, horaFin: 17, duracionSlot: 60 } },
+    ],
+  },
+  {
+    tipo: "educacion",
+    label: "Educación / Clases",
+    descripcion: "Clases o tutorías con instructores.",
+    profesionales: [
+      { nombre: "Instructor 1", especialidad: "Clases particulares", config: { diasLaborales: [1, 2, 3, 4, 5], horaInicio: 14, horaFin: 20, duracionSlot: 60 } },
+    ],
+  },
+  {
+    tipo: "otro",
+    label: "Otro / Personalizado",
+    descripcion: "Empieza sin profesionales y créalos a tu medida.",
+    profesionales: [],
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STORE
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -179,8 +289,75 @@ class AgendaStore {
     recompensaBronce: "Bienvenida: 5% en la siguiente",
   };
 
+  // ── Configuración del negocio (onboarding de Agendamiento) ──
+  /** Reglas globales de citas (persistidas local). */
+  agendaRules: AgendaRules = loadAgendaRules();
+  /** Tipo de negocio elegido en el onboarding (define el preset). */
+  tipoNegocio: TipoNegocioAgenda = "otro";
+  /** True cuando el admin ya completó el onboarding de Agendamiento. */
+  agendamientoConfigurado = false;
+  /**
+   * True cuando hay que mostrar el onboarding de Agendamiento. Solo lo activa
+   * "Simular inicio desde 0"; el inicio normal nunca lo enciende. No se persiste.
+   */
+  onboardingPendiente = false;
+
   constructor() {
     makeAutoObservable(this);
+  }
+
+  // ── Onboarding / configuración del negocio (Agendamiento) ──────────────────
+
+  /** Presets disponibles por tipo de negocio (solo lectura). */
+  get presets(): AgendaPreset[] {
+    return AGENDA_PRESETS;
+  }
+
+  getPreset(tipo: TipoNegocioAgenda): AgendaPreset | undefined {
+    return AGENDA_PRESETS.find((p) => p.tipo === tipo);
+  }
+
+  /** Enciende el onboarding de configuración (usado por "Simular inicio desde 0"). */
+  activarOnboarding(): void {
+    this.onboardingPendiente = true;
+  }
+
+  /** Actualiza (parcialmente) las reglas de citas y persiste. */
+  updateAgendaRules(data: Partial<AgendaRules>): void {
+    const next = { ...this.agendaRules, ...data };
+    if (data.duracionDefault !== undefined && (!Number.isFinite(data.duracionDefault) || data.duracionDefault <= 0)) {
+      next.duracionDefault = this.agendaRules.duracionDefault;
+    }
+    if (data.recordatorioHoras !== undefined && (!Number.isFinite(data.recordatorioHoras) || data.recordatorioHoras < 0)) {
+      next.recordatorioHoras = this.agendaRules.recordatorioHoras;
+    }
+    this.agendaRules = next;
+    persistAgendaRules(this.agendaRules);
+  }
+
+  /**
+   * Aplica un preset: reemplaza TODOS los profesionales por los precargados del
+   * tipo elegido (cada uno materializado con su disponibilidad). Sin tickets.
+   */
+  aplicarPreset(tipo: TipoNegocioAgenda): void {
+    const preset = this.getPreset(tipo);
+    if (!preset) return;
+    this.tipoNegocio = tipo;
+    this.profesionales = preset.profesionales.map((p, i) => ({
+      id: crypto.randomUUID(),
+      nombre: p.nombre,
+      especialidad: p.especialidad,
+      color: AgendaStore.PROF_COLORS[i % AgendaStore.PROF_COLORS.length],
+      avatar: this.inicialesDe(p.nombre),
+      config: { ...p.config },
+    }));
+  }
+
+  /** Cierra el onboarding: marca configurado y apaga la bandera. */
+  guardarConfig(tipo: TipoNegocioAgenda): void {
+    this.tipoNegocio = tipo;
+    this.agendamientoConfigurado = true;
+    this.onboardingPendiente = false;
   }
 
   // ── Modo demo ("desde 0") ────────────────────────────────────────────────
@@ -193,6 +370,10 @@ class AgendaStore {
     this.profesionales = [];
     this.clientes = [];
     this.citas = [];
+    this.agendaRules = { ...DEFAULT_AGENDA_RULES };
+    this.tipoNegocio = "otro";
+    this.agendamientoConfigurado = false;
+    persistAgendaRules(this.agendaRules);
   }
 
   /** Restaura los datos de ejemplo (seed) de Agendamiento para el inicio normal. */
@@ -200,6 +381,8 @@ class AgendaStore {
     this.profesionales = PROFESIONALES;
     this.clientes = seedClientes();
     this.citas = seedCitas();
+    this.agendaRules = loadAgendaRules();
+    this.onboardingPendiente = false;
   }
 
   /** Actualiza la disponibilidad (config) de un profesional concreto. */
